@@ -4,3 +4,6 @@
 # Ada Library Information
 *.ali
 __pycache__
+test_code
+
+
