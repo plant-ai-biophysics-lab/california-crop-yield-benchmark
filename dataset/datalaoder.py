@@ -8,7 +8,7 @@ from torchvision import transforms
 from dataset.exceptions import InvalidDatasetSelection
 from torch.utils.data import Dataset
 from einops import rearrange
-
+from typing import List, Union
 
 from src.configs import set_seed
 set_seed(0)
@@ -17,6 +17,52 @@ set_seed(0)
 EXTREME_LOWER_THRESHOLD = 9  #22.24
 EXTREME_UPPER_THRESHOLD = 22 #54.36
 HECTARE_TO_ACRE_SCALE = 2.471 # 2.2417
+
+def _preprocess_df(df):
+    """pre=processing includes three steps: 
+        1. removing the crops with harvest area equal to 0
+        2. removing the crops with yield 0 
+        4. remove county called "State Total"
+    
+    """
+
+    df = df[df['harvest_acres'] != 0]
+    df = df[df['yield'] > 0]
+    df = df[df['county'] != "State Total"]
+
+    return df
+
+
+def dataloader(county_name: str = 'Monterey', year: Union[List[int], int] = 2008, crop_names: Union[str, List[str], None] = None):
+
+    YieldObs = pd.read_csv('/data2/hkaman/Data/CDL/Ultimate_Complete_Specialty_Crops_Data_with_Year.csv')
+    # YieldObs = _preprocess_df(YieldObs)
+
+
+    # Filter by county
+    if county_name:
+        YieldObs = YieldObs[YieldObs['county'] == county_name]
+    # Filter by year
+    if year:
+        YieldObs = YieldObs[YieldObs['year'].isin(year if isinstance(year, list) else [year])]
+    # Filter by crop names
+    if crop_names:
+        YieldObs = YieldObs[YieldObs['crop_name'].isin(crop_names if isinstance(crop_names, list) else [crop_names])]
+
+
+    downloader = ccdc.DataDownloader(
+        county_name = county_name, 
+        year = year, 
+        crop_names= crop_names)
+
+    output_dataset = downloader(output_type = "all", daily_climate=True)
+
+    
+
+
+
+
+
 
 
 
@@ -71,7 +117,6 @@ def get_dataloaders(
                                                     shuffle=False, num_workers=8) 
 
     return data_loader_training, data_loader_validate, data_loader_test
-
 
 
 class Sentinel_Dataset(Dataset):
