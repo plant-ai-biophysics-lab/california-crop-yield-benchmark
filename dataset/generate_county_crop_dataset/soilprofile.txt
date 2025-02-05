@@ -1,0 +1,111 @@
+mapunit.txt   (MUKEY)    
+      │
+      ├──►  muaggatt.txt   (MUKEY)       # General soil properties (pH, slope, drainage, available water capacity)
+      │
+      ├──►  comp.txt     (MUKEY, COKEY)  # Soil components within a map unit
+            │
+            ├──► chorizon.txt  (COKEY, CHKEY)  # Soil horizon properties (sand, silt, clay, pH, permeability, organic matter)
+            │
+            ├──► cgeomord.txt  (COKEY)        # Geomorphic and landform features (hills, terraces, floodplains, alluvial fans)
+            │
+            ├──► sainterp.txt  (MUKEY)        # Soil suitability for construction, erosion risk, drought resistance
+            │
+            ├──► mucrpyd.txt   (MUKEY)        # Crop yield potential for different crops (e.g., bushels per acre for corn, wheat, soybeans)
+            │
+            ├──► sdvattribute.txt  (Metadata)  # Descriptions of all soil attributes in SSURGO
+            │
+            ├──► ceplants.txt  (MUKEY, COKEY)  # Ecological site classification and plant species data for soil components
+            │
+            ├──► chconsis.txt  (COKEY, CHKEY)  # Soil consistency at different moisture levels (dry, moist, wet)
+            │
+            ├──► chfrags.txt  (COKEY, CHKEY)   # Rock fragment percentages in different soil horizons
+            │
+            ├──► chpores.txt  (COKEY, CHKEY)   # Pore size distribution and soil structure details
+            │
+            ├──► chtext.txt  (COKEY, CHKEY)    # Soil texture classifications (e.g., loam, sandy loam, clay)
+            │
+            ├──► chtexgrp.txt  (COKEY, CHKEY)  # Soil texture group (used in hydrologic and agricultural modeling)
+            │
+            ├──► chaashto.txt  (COKEY, CHKEY)  # AASHTO soil classification system (used in highway engineering)
+            │
+            ├──► chdsuffx.txt  (COKEY, CHKEY)  # Descriptive suffix for soil horizons (e.g., Bt, Ap, Ck)
+            │
+            ├──► cpmatgrp.txt  (COKEY)         # Parent material group (e.g., sedimentary rock, volcanic ash)
+            │
+            ├──► ctxfmmin.txt  (COKEY)         # Texture and mineralogy classification
+            │
+            ├──► ctxmoicl.txt  (COKEY)         # Soil moisture and climate classifications
+            │
+            ├──► csmoist.txt  (COKEY)          # Soil moisture regimes (e.g., aridic, xeric, ustic)
+            │
+            ├──► csfrags.txt  (COKEY)          # Coarse fragments (gravel, cobbles) within soil layers
+            │
+            ├──► csmorgc.txt  (COKEY)          # Organic carbon content
+            │
+            ├──► csmorhpp.txt  (COKEY)         # Soil horizon permeability potential
+            │
+            ├──► csmorss.txt  (COKEY)          # Soil structure stability
+            │
+            ├──► cdfeat.txt  (COKEY)           # Soil depth and restrictive features (e.g., fragipan, bedrock depth)
+            │
+            ├──► ctxfmoth.txt  (COKEY)         # Other soil texture classifications
+            │
+            ├──► csmormr.txt  (COKEY)          # Soil mineralogy and reaction characteristics
+            │
+            ├──► chstrgrp.txt  (COKEY)         # Soil structure grouping classification
+            │
+            ├──► ctext.txt  (COKEY)            # Generalized soil textural classification
+            │
+            ├──► crstrcts.txt  (COKEY)         # Root restriction depth and limitations for plant growth
+            │
+            ├──► distimd.txt  (MUKEY)          # Distance to restrictive soil features
+            │
+            ├──► distlmd.txt  (MUKEY)          # Limiting depth for soil use and management
+            │
+            ├──► distmd.txt  (MUKEY)           # Depth to restrictive layer (e.g., bedrock, hardpan)
+            │
+            ├──► sacatlog.txt  (Metadata)      # Catalog of all SSURGO datasets available
+            │
+            ├──► version.txt  (Metadata)       # Version and update information for the SSURGO database
+
+
+
+
+
+
+For agriculture tasks, the best 10 variables from the SSURGO muaggatt dataset would be:
+
+🌱 Best 10 Variables for Agriculture
+	1.	aws0100wta → Available Water Storage in Top 100 cm (cm H₂O)
+	•	Measures how much water the soil can hold, critical for crop water availability.
+	2.	ph1to1h2o_r → Soil pH in Water
+	•	Affects nutrient availability and crop tolerance.
+	3.	sandtotal_r → Total Sand Percentage
+	•	Impacts drainage and aeration.
+	4.	silttotal_r → Total Silt Percentage
+	•	Contributes to soil structure and fertility.
+	5.	claytotal_r → Total Clay Percentage
+	•	Affects water retention, compaction, and root penetration.
+	6.	drclassdcd → Dominant Drainage Class
+	•	Indicates how well the soil drains water (e.g., well-drained vs. poorly drained).
+	7.	hydgrpdcd → Hydrologic Soil Group
+	•	Determines runoff potential, affecting irrigation and erosion risk.
+	8.	slopegraddcp → Slope Gradient (%)
+	•	Helps assess erosion risk and water runoff.
+	9.	iccdcd → Integrated Crop Classification Code
+	•	Indicates soil suitability for cropping.
+	10.	awmmfpwwta → Available Water for Wetlands
+
+	•	Important for wetland agriculture and flood-prone areas.
+
+🚀 Why These 10 Variables?
+	•	Water Retention & Drainage (aws0100wta, drclassdcd, hydgrpdcd)
+	•	Soil Texture (sandtotal_r, silttotal_r, claytotal_r)
+	•	Soil Chemistry (ph1to1h2o_r)
+	•	Erosion & Land Slope (slopegraddcp)
+	•	Crop Suitability (iccdcd)
+	•	Irrigation & Wetland Potential (awmmfpwwta)
+
+This set provides a balanced mix of soil physics, chemistry, and structure to optimize crop growth, water management, and soil conservation. 🚀
+
+Let me know if you need any refinements! 🔥
