@@ -1,305 +1,52 @@
 nohup: ignoring input
-/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
-  warnings.warn(
-/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
-  warnings.warn(msg)
-Epoch 0[363.022 (s)]: Training Contrastive Loss = 6.269
-Epoch 1[365.079 (s)]: Training Contrastive Loss = 6.102
-Epoch 2[365.381 (s)]: Training Contrastive Loss = 5.976
-Epoch 3[365.491 (s)]: Training Contrastive Loss = 5.891
-Epoch 4[364.937 (s)]: Training Contrastive Loss = 5.802
-Epoch 5[364.206 (s)]: Training Contrastive Loss = 5.765
-Epoch 6[366.335 (s)]: Training Contrastive Loss = 5.734
-Epoch 7[365.746 (s)]: Training Contrastive Loss = 5.709
-Epoch 8[367.261 (s)]: Training Contrastive Loss = 5.670
-Epoch 9[368.479 (s)]: Training Contrastive Loss = 5.654
-Epoch 10[366.195 (s)]: Training Contrastive Loss = 5.639
-Epoch 11[365.972 (s)]: Training Contrastive Loss = 5.624
-Epoch 12[378.655 (s)]: Training Contrastive Loss = 5.613
-Epoch 13[372.970 (s)]: Training Contrastive Loss = 5.613
-Epoch 14[364.782 (s)]: Training Contrastive Loss = 5.588
-Epoch 15[365.123 (s)]: Training Contrastive Loss = 5.553
-Epoch 16[363.972 (s)]: Training Contrastive Loss = 5.551
-Epoch 17[365.505 (s)]: Training Contrastive Loss = 5.536
-Epoch 18[365.974 (s)]: Training Contrastive Loss = 5.529
-Epoch 19[365.104 (s)]: Training Contrastive Loss = 5.529
-Epoch 20[364.855 (s)]: Training Contrastive Loss = 5.512
-Epoch 21[364.235 (s)]: Training Contrastive Loss = 5.512
-Epoch 22[367.007 (s)]: Training Contrastive Loss = 5.501
-Epoch 23[364.500 (s)]: Training Contrastive Loss = 5.499
-Epoch 24[364.655 (s)]: Training Contrastive Loss = 5.495
-Epoch 25[364.561 (s)]: Training Contrastive Loss = 5.494
-Epoch 26[364.244 (s)]: Training Contrastive Loss = 5.489
-Epoch 27[364.655 (s)]: Training Contrastive Loss = 5.482
-Epoch 28[364.740 (s)]: Training Contrastive Loss = 5.480
-Epoch 29[365.631 (s)]: Training Contrastive Loss = 5.479
-Epoch 30[364.212 (s)]: Training Contrastive Loss = 5.469
-Epoch 31[364.583 (s)]: Training Contrastive Loss = 5.462
-Epoch 32[365.648 (s)]: Training Contrastive Loss = 5.454
-Epoch 33[364.711 (s)]: Training Contrastive Loss = 5.453
-Epoch 34[364.438 (s)]: Training Contrastive Loss = 5.448
-Epoch 35[365.087 (s)]: Training Contrastive Loss = 5.442
-Epoch 36[367.916 (s)]: Training Contrastive Loss = 5.439
-Epoch 37[365.532 (s)]: Training Contrastive Loss = 5.437
-Epoch 38[365.180 (s)]: Training Contrastive Loss = 5.436
-Epoch 39[365.365 (s)]: Training Contrastive Loss = 5.438
-Epoch 40[363.922 (s)]: Training Contrastive Loss = 5.433
-Epoch 41[364.998 (s)]: Training Contrastive Loss = 5.431
-Epoch 42[365.255 (s)]: Training Contrastive Loss = 5.428
-Epoch 43[364.628 (s)]: Training Contrastive Loss = 5.426
-Epoch 44[364.507 (s)]: Training Contrastive Loss = 5.418
-Epoch 45[363.870 (s)]: Training Contrastive Loss = 5.421
-Epoch 46[365.899 (s)]: Training Contrastive Loss = 5.417
-Epoch 47[365.749 (s)]: Training Contrastive Loss = 5.413
-Epoch 48[365.934 (s)]: Training Contrastive Loss = 5.411
-Epoch 49[365.163 (s)]: Training Contrastive Loss = 5.411
-Epoch 50[365.474 (s)]: Training Contrastive Loss = 5.407
-Epoch 51[367.443 (s)]: Training Contrastive Loss = 5.404
-Epoch 52[366.180 (s)]: Training Contrastive Loss = 5.406
-Epoch 53[366.936 (s)]: Training Contrastive Loss = 5.402
-Epoch 54[365.643 (s)]: Training Contrastive Loss = 5.398
-Epoch 55[365.580 (s)]: Training Contrastive Loss = 5.400
-Epoch 56[365.888 (s)]: Training Contrastive Loss = 5.396
-Epoch 57[365.799 (s)]: Training Contrastive Loss = 5.397
-Epoch 58[365.060 (s)]: Training Contrastive Loss = 5.395
-Epoch 59[365.491 (s)]: Training Contrastive Loss = 5.394
-Epoch 60[365.933 (s)]: Training Contrastive Loss = 5.393
-Epoch 61[365.509 (s)]: Training Contrastive Loss = 5.390
-Epoch 62[365.432 (s)]: Training Contrastive Loss = 5.388
-Epoch 63[367.283 (s)]: Training Contrastive Loss = 5.389
-Epoch 64[366.049 (s)]: Training Contrastive Loss = 5.387
-Epoch 65[369.954 (s)]: Training Contrastive Loss = 5.388
-Epoch 66[366.222 (s)]: Training Contrastive Loss = 5.386
-Epoch 67[365.743 (s)]: Training Contrastive Loss = 5.386
-Epoch 68[366.367 (s)]: Training Contrastive Loss = 5.386
-Epoch 69[365.977 (s)]: Training Contrastive Loss = 5.386
-Epoch 70[365.796 (s)]: Training Contrastive Loss = 5.382
-Epoch 71[366.504 (s)]: Training Contrastive Loss = 5.384
-Epoch 72[366.969 (s)]: Training Contrastive Loss = 5.382
-Epoch 73[380.111 (s)]: Training Contrastive Loss = 5.380
-Epoch 74[367.660 (s)]: Training Contrastive Loss = 5.380
-Epoch 75[365.449 (s)]: Training Contrastive Loss = 5.378
-Epoch 76[378.844 (s)]: Training Contrastive Loss = 5.379
-Epoch 77[365.662 (s)]: Training Contrastive Loss = 5.379
-Epoch 78[374.287 (s)]: Training Contrastive Loss = 5.377
-Epoch 79[383.223 (s)]: Training Contrastive Loss = 5.378
-Epoch 80[367.149 (s)]: Training Contrastive Loss = 5.376
-Epoch 81[365.155 (s)]: Training Contrastive Loss = 5.376
-Epoch 82[364.464 (s)]: Training Contrastive Loss = 5.374
-Epoch 83[364.020 (s)]: Training Contrastive Loss = 5.376
-Epoch 84[365.220 (s)]: Training Contrastive Loss = 5.373
-Epoch 85[365.006 (s)]: Training Contrastive Loss = 5.371
-Epoch 86[363.390 (s)]: Training Contrastive Loss = 5.373
-Epoch 87[363.864 (s)]: Training Contrastive Loss = 5.373
-Epoch 88[363.987 (s)]: Training Contrastive Loss = 5.375
-Epoch 89[364.716 (s)]: Training Contrastive Loss = 5.372
-Epoch 90[364.233 (s)]: Training Contrastive Loss = 5.370
-Epoch 91[364.170 (s)]: Training Contrastive Loss = 5.370
-Epoch 92[364.163 (s)]: Training Contrastive Loss = 5.370
-Epoch 93[364.366 (s)]: Training Contrastive Loss = 5.370
-Epoch 94[365.086 (s)]: Training Contrastive Loss = 5.370
-Epoch 95[364.339 (s)]: Training Contrastive Loss = 5.369
-Epoch 96[365.191 (s)]: Training Contrastive Loss = 5.367
-Epoch 97[363.761 (s)]: Training Contrastive Loss = 5.369
-Epoch 98[364.869 (s)]: Training Contrastive Loss = 5.365
-Epoch 99[364.538 (s)]: Training Contrastive Loss = 5.365
-Epoch 100[365.048 (s)]: Training Contrastive Loss = 5.365
-Epoch 101[364.310 (s)]: Training Contrastive Loss = 5.364
-Epoch 102[364.943 (s)]: Training Contrastive Loss = 5.364
-Epoch 103[365.393 (s)]: Training Contrastive Loss = 5.363
-Epoch 104[364.322 (s)]: Training Contrastive Loss = 5.365
-Epoch 105[364.702 (s)]: Training Contrastive Loss = 5.363
-Epoch 106[364.903 (s)]: Training Contrastive Loss = 5.365
-Epoch 107[362.925 (s)]: Training Contrastive Loss = 5.363
-Epoch 108[366.862 (s)]: Training Contrastive Loss = 5.364
-Epoch 109[365.161 (s)]: Training Contrastive Loss = 5.364
-Epoch 110[364.597 (s)]: Training Contrastive Loss = 5.362
-Epoch 111[364.313 (s)]: Training Contrastive Loss = 5.361
-Epoch 112[364.233 (s)]: Training Contrastive Loss = 5.358
-Epoch 113[364.191 (s)]: Training Contrastive Loss = 5.362
-Epoch 114[364.658 (s)]: Training Contrastive Loss = 5.359
-Epoch 115[364.651 (s)]: Training Contrastive Loss = 5.361
-Epoch 116[364.398 (s)]: Training Contrastive Loss = 5.359
-Epoch 117[364.949 (s)]: Training Contrastive Loss = 5.357
-Epoch 118[364.962 (s)]: Training Contrastive Loss = 5.358
-Epoch 119[364.718 (s)]: Training Contrastive Loss = 5.358
-Epoch 120[365.488 (s)]: Training Contrastive Loss = 5.358
-Epoch 121[363.841 (s)]: Training Contrastive Loss = 5.360
-Epoch 122[366.188 (s)]: Training Contrastive Loss = 5.358
-Epoch 123[364.954 (s)]: Training Contrastive Loss = 5.355
-Epoch 124[365.282 (s)]: Training Contrastive Loss = 5.358
-Epoch 125[364.434 (s)]: Training Contrastive Loss = 5.357
-Epoch 126[365.699 (s)]: Training Contrastive Loss = 5.356
-Epoch 127[364.770 (s)]: Training Contrastive Loss = 5.355
-Epoch 128[363.565 (s)]: Training Contrastive Loss = 5.357
-Epoch 129[364.092 (s)]: Training Contrastive Loss = 5.354
-Epoch 130[365.017 (s)]: Training Contrastive Loss = 5.352
-Epoch 131[364.135 (s)]: Training Contrastive Loss = 5.352
-Epoch 132[364.463 (s)]: Training Contrastive Loss = 5.352
-Epoch 133[363.741 (s)]: Training Contrastive Loss = 5.354
-Epoch 134[364.237 (s)]: Training Contrastive Loss = 5.352
-Epoch 135[364.536 (s)]: Training Contrastive Loss = 5.351
-Epoch 136[364.118 (s)]: Training Contrastive Loss = 5.352
-Epoch 137[367.296 (s)]: Training Contrastive Loss = 5.353
-Epoch 138[365.653 (s)]: Training Contrastive Loss = 5.351
-Epoch 139[365.825 (s)]: Training Contrastive Loss = 5.352
-Epoch 140[365.893 (s)]: Training Contrastive Loss = 5.352
-Epoch 141[365.568 (s)]: Training Contrastive Loss = 5.351
-Epoch 142[365.131 (s)]: Training Contrastive Loss = 5.351
-Epoch 143[365.217 (s)]: Training Contrastive Loss = 5.350
-Epoch 144[365.487 (s)]: Training Contrastive Loss = 5.348
-Epoch 145[365.454 (s)]: Training Contrastive Loss = 5.348
-Epoch 146[365.773 (s)]: Training Contrastive Loss = 5.349
-Epoch 147[365.932 (s)]: Training Contrastive Loss = 5.347
-Epoch 148[365.935 (s)]: Training Contrastive Loss = 5.348
-Epoch 149[365.402 (s)]: Training Contrastive Loss = 5.349
-Epoch 150[365.403 (s)]: Training Contrastive Loss = 5.349
-Epoch 151[366.562 (s)]: Training Contrastive Loss = 5.347
-Epoch 152[365.081 (s)]: Training Contrastive Loss = 5.348
-Epoch 153[365.472 (s)]: Training Contrastive Loss = 5.346
-Epoch 154[365.614 (s)]: Training Contrastive Loss = 5.346
-Epoch 155[365.973 (s)]: Training Contrastive Loss = 5.346
-Epoch 156[365.389 (s)]: Training Contrastive Loss = 5.346
-Epoch 157[365.618 (s)]: Training Contrastive Loss = 5.344
-Epoch 158[365.134 (s)]: Training Contrastive Loss = 5.347
-Epoch 159[365.735 (s)]: Training Contrastive Loss = 5.346
-Epoch 160[365.538 (s)]: Training Contrastive Loss = 5.345
-Epoch 161[364.969 (s)]: Training Contrastive Loss = 5.345
-Epoch 162[365.791 (s)]: Training Contrastive Loss = 5.345
-Epoch 163[366.051 (s)]: Training Contrastive Loss = 5.344
-Epoch 164[365.459 (s)]: Training Contrastive Loss = 5.346
-Epoch 165[367.544 (s)]: Training Contrastive Loss = 5.347
-Epoch 166[365.856 (s)]: Training Contrastive Loss = 5.343
-Epoch 167[365.241 (s)]: Training Contrastive Loss = 5.343
-Epoch 168[364.943 (s)]: Training Contrastive Loss = 5.344
-Epoch 169[364.532 (s)]: Training Contrastive Loss = 5.342
-Epoch 170[365.430 (s)]: Training Contrastive Loss = 5.343
-Epoch 171[365.732 (s)]: Training Contrastive Loss = 5.342
-Epoch 172[365.731 (s)]: Training Contrastive Loss = 5.341
-Epoch 173[365.161 (s)]: Training Contrastive Loss = 5.341
-Epoch 174[365.878 (s)]: Training Contrastive Loss = 5.341
-Epoch 175[365.416 (s)]: Training Contrastive Loss = 5.340
-Epoch 176[365.626 (s)]: Training Contrastive Loss = 5.342
-Epoch 177[366.637 (s)]: Training Contrastive Loss = 5.342
-Epoch 178[365.877 (s)]: Training Contrastive Loss = 5.340
-Epoch 179[365.182 (s)]: Training Contrastive Loss = 5.339
-Epoch 180[367.064 (s)]: Training Contrastive Loss = 5.340
-Epoch 181[365.260 (s)]: Training Contrastive Loss = 5.338
-Epoch 182[365.798 (s)]: Training Contrastive Loss = 5.339
-Epoch 183[366.527 (s)]: Training Contrastive Loss = 5.338
-Epoch 184[365.343 (s)]: Training Contrastive Loss = 5.337
-Epoch 185[364.962 (s)]: Training Contrastive Loss = 5.337
-Epoch 186[366.178 (s)]: Training Contrastive Loss = 5.337
-Epoch 187[366.023 (s)]: Training Contrastive Loss = 5.338
-Epoch 188[365.457 (s)]: Training Contrastive Loss = 5.337
-Epoch 189[365.890 (s)]: Training Contrastive Loss = 5.337
-Epoch 190[365.688 (s)]: Training Contrastive Loss = 5.337
-Epoch 191[365.024 (s)]: Training Contrastive Loss = 5.335
-Epoch 192[365.746 (s)]: Training Contrastive Loss = 5.336
-Epoch 193[365.572 (s)]: Training Contrastive Loss = 5.336
-Epoch 194[368.046 (s)]: Training Contrastive Loss = 5.335
-Epoch 195[365.977 (s)]: Training Contrastive Loss = 5.334
-Epoch 196[365.124 (s)]: Training Contrastive Loss = 5.336
-Epoch 197[365.564 (s)]: Training Contrastive Loss = 5.336
-Epoch 198[366.247 (s)]: Training Contrastive Loss = 5.333
-Epoch 199[366.996 (s)]: Training Contrastive Loss = 5.334
-Epoch 200[366.746 (s)]: Training Contrastive Loss = 5.333
-Epoch 201[366.084 (s)]: Training Contrastive Loss = 5.333
-Epoch 202[366.537 (s)]: Training Contrastive Loss = 5.333
-Epoch 203[365.746 (s)]: Training Contrastive Loss = 5.332
-Epoch 204[369.985 (s)]: Training Contrastive Loss = 5.335
-Epoch 205[366.673 (s)]: Training Contrastive Loss = 5.333
-Epoch 206[368.179 (s)]: Training Contrastive Loss = 5.333
-Epoch 207[369.181 (s)]: Training Contrastive Loss = 5.331
-Epoch 208[370.100 (s)]: Training Contrastive Loss = 5.332
-Epoch 209[372.492 (s)]: Training Contrastive Loss = 5.333
-Epoch 210[378.872 (s)]: Training Contrastive Loss = 5.333
-Epoch 211[378.727 (s)]: Training Contrastive Loss = 5.331
-Epoch 212[367.408 (s)]: Training Contrastive Loss = 5.330
-Epoch 213[369.083 (s)]: Training Contrastive Loss = 5.330
-Epoch 214[369.507 (s)]: Training Contrastive Loss = 5.331
-Epoch 215[366.590 (s)]: Training Contrastive Loss = 5.330
-Epoch 216[368.157 (s)]: Training Contrastive Loss = 5.331
-Epoch 217[368.300 (s)]: Training Contrastive Loss = 5.331
-Epoch 218[377.063 (s)]: Training Contrastive Loss = 5.330
-Epoch 219[370.827 (s)]: Training Contrastive Loss = 5.330
-Epoch 220[366.483 (s)]: Training Contrastive Loss = 5.328
-Epoch 221[372.289 (s)]: Training Contrastive Loss = 5.328
-Epoch 222[370.952 (s)]: Training Contrastive Loss = 5.329
-Epoch 223[368.496 (s)]: Training Contrastive Loss = 5.330
-Epoch 224[368.407 (s)]: Training Contrastive Loss = 5.328
-Epoch 225[384.035 (s)]: Training Contrastive Loss = 5.328
-Epoch 226[366.658 (s)]: Training Contrastive Loss = 5.328
-Epoch 227[368.593 (s)]: Training Contrastive Loss = 5.331
-Epoch 228[366.846 (s)]: Training Contrastive Loss = 5.328
-Epoch 229[384.105 (s)]: Training Contrastive Loss = 5.328
-Epoch 230[366.802 (s)]: Training Contrastive Loss = 5.327
-Epoch 231[384.893 (s)]: Training Contrastive Loss = 5.326
-Epoch 232[366.601 (s)]: Training Contrastive Loss = 5.325
-Epoch 233[370.694 (s)]: Training Contrastive Loss = 5.326
-Epoch 234[371.168 (s)]: Training Contrastive Loss = 5.326
-Epoch 235[398.352 (s)]: Training Contrastive Loss = 5.326
-Epoch 236[373.208 (s)]: Training Contrastive Loss = 5.325
-Epoch 237[374.273 (s)]: Training Contrastive Loss = 5.327
-Epoch 238[375.132 (s)]: Training Contrastive Loss = 5.328
-Epoch 239[366.067 (s)]: Training Contrastive Loss = 5.326
-Epoch 240[370.655 (s)]: Training Contrastive Loss = 5.326
-Epoch 241[375.975 (s)]: Training Contrastive Loss = 5.325
-Epoch 242[369.921 (s)]: Training Contrastive Loss = 5.327
-Epoch 243[370.955 (s)]: Training Contrastive Loss = 5.324
-Epoch 244[386.166 (s)]: Training Contrastive Loss = 5.324
-Epoch 245[398.375 (s)]: Training Contrastive Loss = 5.323
-Epoch 246[383.139 (s)]: Training Contrastive Loss = 5.326
-Epoch 247[379.333 (s)]: Training Contrastive Loss = 5.324
-Epoch 248[391.099 (s)]: Training Contrastive Loss = 5.323
-Epoch 249[415.853 (s)]: Training Contrastive Loss = 5.323
-Epoch 250[410.125 (s)]: Training Contrastive Loss = 5.324
-Epoch 251[384.784 (s)]: Training Contrastive Loss = 5.323
-Epoch 252[387.918 (s)]: Training Contrastive Loss = 5.323
-Epoch 253[366.557 (s)]: Training Contrastive Loss = 5.324
-Epoch 254[366.480 (s)]: Training Contrastive Loss = 5.322
-Epoch 255[367.458 (s)]: Training Contrastive Loss = 5.325
-Epoch 256[407.212 (s)]: Training Contrastive Loss = 5.321
-Epoch 257[389.215 (s)]: Training Contrastive Loss = 5.321
-Epoch 258[392.076 (s)]: Training Contrastive Loss = 5.321
-Epoch 259[395.943 (s)]: Training Contrastive Loss = 5.321
-Epoch 260[392.431 (s)]: Training Contrastive Loss = 5.324
-Epoch 261[382.064 (s)]: Training Contrastive Loss = 5.323
-Epoch 262[387.925 (s)]: Training Contrastive Loss = 5.323
-Epoch 263[385.871 (s)]: Training Contrastive Loss = 5.321
-Epoch 264[387.814 (s)]: Training Contrastive Loss = 5.321
-Epoch 265[380.779 (s)]: Training Contrastive Loss = 5.321
-Epoch 266[391.350 (s)]: Training Contrastive Loss = 5.319
-Epoch 267[396.185 (s)]: Training Contrastive Loss = 5.320
-Epoch 268[375.471 (s)]: Training Contrastive Loss = 5.321
-Epoch 269[366.828 (s)]: Training Contrastive Loss = 5.320
-Epoch 270[366.106 (s)]: Training Contrastive Loss = 5.321
-Epoch 271[366.988 (s)]: Training Contrastive Loss = 5.322
-Epoch 272[366.570 (s)]: Training Contrastive Loss = 5.319
-Epoch 273[366.078 (s)]: Training Contrastive Loss = 5.320
-Epoch 274[364.854 (s)]: Training Contrastive Loss = 5.321
-Epoch 275[367.855 (s)]: Training Contrastive Loss = 5.319
-Epoch 276[382.648 (s)]: Training Contrastive Loss = 5.319
-Epoch 277[365.978 (s)]: Training Contrastive Loss = 5.320
-Epoch 278[366.335 (s)]: Training Contrastive Loss = 5.320
-Epoch 279[367.546 (s)]: Training Contrastive Loss = 5.319
-Epoch 280[367.436 (s)]: Training Contrastive Loss = 5.319
-Epoch 281[366.599 (s)]: Training Contrastive Loss = 5.319
-Epoch 282[386.928 (s)]: Training Contrastive Loss = 5.319
-Epoch 283[396.470 (s)]: Training Contrastive Loss = 5.319
-Epoch 284[397.376 (s)]: Training Contrastive Loss = 5.320
-Epoch 285[397.725 (s)]: Training Contrastive Loss = 5.319
-Epoch 286[398.338 (s)]: Training Contrastive Loss = 5.318
-Epoch 287[398.619 (s)]: Training Contrastive Loss = 5.317
-Epoch 288[396.989 (s)]: Training Contrastive Loss = 5.317
-Epoch 289[397.662 (s)]: Training Contrastive Loss = 5.318
-Epoch 290[397.319 (s)]: Training Contrastive Loss = 5.318
-Epoch 291[398.536 (s)]: Training Contrastive Loss = 5.318
-Epoch 292[398.228 (s)]: Training Contrastive Loss = 5.316
-Epoch 293[398.278 (s)]: Training Contrastive Loss = 5.317
-Epoch 294[398.814 (s)]: Training Contrastive Loss = 5.317
-Epoch 295[398.524 (s)]: Training Contrastive Loss = 5.318
-Epoch 296[397.582 (s)]: Training Contrastive Loss = 5.317
-Epoch 297[398.997 (s)]: Training Contrastive Loss = 5.317
-Epoch 298[398.377 (s)]: Training Contrastive Loss = 5.316
-Epoch 299[397.817 (s)]: Training Contrastive Loss = 5.316
+Monterey | train = 156, valid = 36, test = 35
+Model Parameteres: 19694081  
+****************************************************************
+Traceback (most recent call last):
+  File "/home/hkaman/Documents/foundational-model-ca-cdl/run.py", line 74, in <module>
+    main(args)
+  File "/home/hkaman/Documents/foundational-model-ca-cdl/run.py", line 38, in main
+    M.train(
+  File "/home/hkaman/Documents/foundational-model-ca-cdl/utils/misc.py", line 240, in train
+    list_ytrain_pred = model(                    
+                       ^^^^^^
+  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hkaman/Documents/foundational-model-ca-cdl/src/YieldB.py", line 107, in forward
+    out = self.time_series(
+          ^^^^^^^^^^^^^^^^^
+  File "/home/hkaman/Documents/foundational-model-ca-cdl/src/YieldB.py", line 92, in time_series
+    l_embed , et_embed, climate_embed, soil_embed = mmt_embed(landsat_t, et_t, climate_t, soil)
+                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hkaman/Documents/foundational-model-ca-cdl/src/attention.py", line 506, in forward
+    l_embed = self.landsat(landsat)  
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hkaman/Documents/foundational-model-ca-cdl/src/attention.py", line 132, in forward
+    x = self.linear_proj(x)  # (B*T*N, EmbedDim)
+        ^^^^^^^^^^^^^^^^^^^
+  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/linear.py", line 114, in forward
+    return F.linear(input, self.weight, self.bias)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 1.32 GiB. GPU 0 has a total capacty of 23.65 GiB of which 435.75 MiB is free. Including non-PyTorch memory, this process has 21.47 GiB memory in use. Of the allocated memory 18.53 GiB is allocated by PyTorch, and 1.78 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF

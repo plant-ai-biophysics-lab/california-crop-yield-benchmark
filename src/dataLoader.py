@@ -1,31 +1,244 @@
 import os
 import numpy as np
 import pandas as pd
-# from src.configs import set_seed
-# set_seed(0)
-
 import geopandas as gpd
 from typing import List
 import rasterio
 from rasterio.enums import Resampling
-from rasterio.warp import calculate_default_transform, reproject
+from rasterio.warp import reproject
 import xarray as xr
 from rasterio.features import rasterize
-import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
-from rasterio.transform import from_origin
 from rasterio.transform import from_bounds
 from shapely.geometry import shape, mapping
-import geojson
 from typing import List, Union
 from skimage.transform import resize
-
+import torch
 from torch.utils.data import Dataset
+# from src.configs import set_seed
+# set_seed(1987)
 
 
-EXTREME_LOWER_THRESHOLD = 9  #22.24
-EXTREME_UPPER_THRESHOLD = 22 #54.36
-HECTARE_TO_ACRE_SCALE = 2.471 # 2.2417
+def read_and_split_csf_files(base_path):
+
+    train_years = list(range(2008, 2012)) + list(range(2013, 2019))  # Excludes 2012
+    valid_years = [2019, 2020]
+    test_years = [2021, 2022]
+
+    train_df, valid_df, test_df = [], [], []
+
+    for year in range(2008, 2023):  # Loop through all expected years
+        folder_path = os.path.join(base_path, str(year))
+        csv_file = os.path.join(folder_path, f"yield_{year}.csv")  # Assuming filename matches the year
+
+        if year == 2012 or not os.path.exists(csv_file):
+            continue  # Skip missing years or non-existing files
+
+        df = pd.read_csv(csv_file)  # Update if a different format is needed
+        df = df[df['key_crop_name'] != 'No Match']
+
+        if year in train_years:
+            train_df.append(df)
+        elif year in valid_years:
+            valid_df.append(df)
+        elif year in test_years:
+            test_df.append(df)
+
+    # Concatenate dataframes
+    train_df = pd.concat(train_df, ignore_index=True) if train_df else None
+    valid_df = pd.concat(valid_df, ignore_index=True) if valid_df else None
+    test_df = pd.concat(test_df, ignore_index=True) if test_df else None
+
+    return train_df, valid_df, test_df
+    
+def dataloader(county_name: str = 'Monterey', batch_size: int = 8):
+
+    base_csv_path = f'/data2/hkaman/Data/FoundationModel/{county_name}/InD/'
+
+    train_df, valid_df, test_df = read_and_split_csf_files(base_csv_path)
+    print(f"{county_name} | train = {train_df.shape[0]}, valid = {valid_df.shape[0]}, test = {test_df.shape[0]}")
+
+
+    dataset_training = DataGen(
+        train_df
+    )
+
+    dataset_validate = DataGen(
+        valid_df
+    )
+    
+    dataset_test = DataGen(
+        test_df
+    )  
+
+
+    data_loader_training = torch.utils.data.DataLoader(dataset_training, batch_size= batch_size, 
+                                                    shuffle=True, collate_fn=custom_collate, num_workers=8)  #
+    data_loader_validate = torch.utils.data.DataLoader(dataset_validate, batch_size= batch_size, 
+                                                    shuffle=False, collate_fn=custom_collate, num_workers=8)  
+    data_loader_test     = torch.utils.data.DataLoader(dataset_test, batch_size=batch_size, 
+                                                    shuffle=False, collate_fn=custom_collate, num_workers=8) 
+
+    return data_loader_training, data_loader_validate, data_loader_test
+
+class DataGen(Dataset):
+    def __init__(self, df: pd.DataFrame):
+        self.df = df
+        self.base_path = '/data2/hkaman/Data/FoundationModel'
+
+    def __len__(self):
+        return len(self.df)
+
+    def standardized(self, data):
+        return data  # Placeholder for standardization
+
+    def __getitem__(self, idx):
+        """ Fetches the sample only if it's valid """
+        # actual_idx = self.valid_indices[idx]  # Map to the original dataset index
+
+        year = self.df.loc[idx, 'year']
+        crop_name = self.df.loc[idx, 'key_crop_name'].strip()
+        county = self.df.loc[idx, 'county'].strip()
+
+        npz_file_path = os.path.join(self.base_path, f'{county}', 'InD', f'{year}', f'{county}_{year}.npz')
+        loaded_data = np.load(npz_file_path, allow_pickle=True)["input"].item()
+  
+        landsat = self.standardized(loaded_data[crop_name]['landsat_data'])  # (12, 6, N)
+        # landsat = torch.as_tensor(landsat, dtype=torch.float32)
+
+        et = self.standardized(loaded_data[crop_name]['et_data'][:, :1, :])  # (12, 1, N)
+        # et = torch.as_tensor(et, dtype=torch.float32)
+
+        climate = self.standardized(loaded_data[crop_name]['climate_data'])  # (365, 8, M)
+        # climate = torch.as_tensor(climate, dtype=torch.float32)
+
+        soil = self.standardized(loaded_data[crop_name]['soil_data'].reshape(1, 5, -1))  # (1, 5, N)
+        # soil = torch.as_tensor(soil, dtype=torch.float32)
+
+
+        original_y = self.df.loc[idx]['yield']
+        # original_y = torch.as_tensor(original_y, dtype=torch.float32)
+
+        sample = {
+            "year": year, 
+            "county": county, 
+            "crop_name": crop_name,
+            "satellite": landsat,
+            "et": et,
+            "climate": climate,
+            "soil": soil,
+            "yield": original_y
+        }
+        return sample
+    
+    def standardized(self, array):
+        """
+        Standardize and normalize Landsat time series imagery.
+        
+        Args:
+            landsat_ts (numpy array): Landsat timeseries with shape (12, 6, N)
+                                    where 12 = months, 6 = bands, N = vectorized pixels.
+        
+        Returns:
+            numpy array: Standardized and normalized Landsat imagery with shape (12, 6, N).
+        """
+        T, B, N = array.shape  
+
+       
+        mean_per_band = np.mean(array, axis=(0, 2), keepdims=True)  
+        std_per_band = np.std(array, axis=(0, 2), keepdims=True) + 1e-10  
+
+        # Apply Z-score normalization
+        standardized = (array - mean_per_band) / std_per_band  
+
+
+        return standardized
+        
+# def pad_tensor(data, max_size, fill_value=-9999):
+#     """
+#     Pads a tensor along the last dimension to match max_size.
+#     """
+#     current_size = data.shape[-1]
+#     if current_size < max_size:
+#         pad_size = max_size - current_size
+#         pad_shape = list(data.shape[:-1]) + [pad_size]
+#         padding = np.full(pad_shape, fill_value, dtype=data.dtype)
+#         return np.concatenate([data, padding], axis=-1)
+#     return data
+
+# def custom_collate(batch):
+#     """
+#     Custom collate function to pad all tensors to the max size in the batch.
+#     """
+#     # Find max size for padding
+#     N_max = max(sample["satellite"].shape[-1] for sample in batch)
+#     M_max = max(sample["climate"].shape[-1] for sample in batch)
+
+#     # Pad each tensor
+#     padded_batch = {
+#         "satellite": torch.tensor([pad_tensor(sample["satellite"], N_max) for sample in batch], dtype=torch.float32),
+#         "et": torch.tensor([pad_tensor(sample["et"], N_max) for sample in batch], dtype=torch.float32),
+#         "climate": torch.tensor([pad_tensor(sample["climate"], M_max) for sample in batch], dtype=torch.float32),
+#         "soil": torch.tensor([pad_tensor(sample["soil"], N_max) for sample in batch], dtype=torch.float32),
+#         "yield": torch.tensor([sample["yield"] for sample in batch], dtype=torch.float32)
+#     }
+#     return padded_batch
+
+
+def pad_tensor_fast(batch_tensors, max_size, fill_value=-9999):
+    """
+    Efficiently pads a batch of tensors to match the max_size along the last dimension.
+    Uses pre-allocated tensors instead of Python loops.
+    """
+    batch_size = len(batch_tensors)
+    shape = list(batch_tensors[0].shape[:-1]) + [max_size]  # (Batch, other_dims..., max_size)
+    
+    # Pre-allocate tensor with fill_value
+    padded = np.full((batch_size, *shape), fill_value, dtype=batch_tensors[0].dtype)
+
+    # Copy valid values
+    for i, tensor in enumerate(batch_tensors):
+        size = tensor.shape[-1]
+        padded[i, ..., :size] = tensor  # Copy only valid data
+    
+    return torch.tensor(padded, dtype=torch.float32)
+
+def custom_collate(batch):
+    """
+    Optimized custom collate function to pad all tensors efficiently.
+    """
+    # Extract all tensors into lists
+    satellite_batch = [sample["satellite"] for sample in batch]
+    et_batch = [sample["et"] for sample in batch]
+    climate_batch = [sample["climate"] for sample in batch]
+    soil_batch = [sample["soil"] for sample in batch]
+    yield_batch = torch.tensor([sample["yield"] for sample in batch], dtype=torch.float32)
+
+    # Find max sizes
+    N_max = max(s.shape[-1] for s in satellite_batch)
+    M_max = max(c.shape[-1] for c in climate_batch)
+
+    # Pad efficiently
+    padded_batch = {
+        "satellite": pad_tensor_fast(satellite_batch, N_max),
+        "et": pad_tensor_fast(et_batch, N_max),
+        "climate": pad_tensor_fast(climate_batch, M_max),
+        "soil": pad_tensor_fast(soil_batch, N_max),
+        "yield": yield_batch
+    }
+    return padded_batch
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def _preprocess_df(df):
     """pre=processing includes three steps: 
@@ -40,8 +253,6 @@ def _preprocess_df(df):
     df = df[df['county'] != "State Total"]
 
     return df
-
-
 
 class TT:
 
@@ -410,101 +621,6 @@ class TT:
         # Threshold: Any value > 0 means at least one contributing pixel was 1
         return (resampled_area > 0).astype(np.uint8)
 
-
-
-
-def read_and_split_csf_files(base_path):
-
-    train_years = list(range(2008, 2012)) + list(range(2013, 2019))  # Excludes 2012
-    valid_years = [2019, 2020]
-    test_years = [2021, 2022]
-
-    train_df, valid_df, test_df = [], [], []
-
-    for year in range(2008, 2023):  # Loop through all expected years
-        folder_path = os.path.join(base_path, str(year))
-        csv_file = os.path.join(folder_path, f"yield_{year}.csv")  # Assuming filename matches the year
-
-        if year == 2012 or not os.path.exists(csv_file):
-            continue  # Skip missing years or non-existing files
-
-        df = pd.read_csv(csv_file)  # Update if a different format is needed
-        df = df[df['key_crop_name'] != 'No Match']
-
-        if year in train_years:
-            train_df.append(df)
-        elif year in valid_years:
-            valid_df.append(df)
-        elif year in test_years:
-            test_df.append(df)
-
-    # Concatenate dataframes
-    train_df = pd.concat(train_df, ignore_index=True) if train_df else None
-    valid_df = pd.concat(valid_df, ignore_index=True) if valid_df else None
-    test_df = pd.concat(test_df, ignore_index=True) if test_df else None
-
-    return train_df, valid_df, test_df
-    
-
-
-def dataloader(county_name: str = 'Monterey'):
-
-
-    base_csv_path = f'/data2/hkaman/Data/FoundationModel/{county_name}/InD/'
-
-    train_df, valid_df, test_df = read_and_split_csf_files(base_csv_path)
-    print(train_df.shape, valid_df.shape, test_df.shape)
-
-    DataGen(df = train_df).__getitem__(20)
-
-
-
-
-
-
-class DataGen(Dataset):
-    def __init__(self, df: pd.DataFrame):
-        self.df = df
-        self.base_path = '/data2/hkaman/Data/FoundationModel'
-        
-    def __len__(self):
-        return len(self.df)
-
-
-    def __getitem__(self, idx):
-
-        year = self.df.loc[idx, 'year'] 
-        crop_name = self.df.loc[idx, 'key_crop_name'].strip()
-        county = self.df.loc[idx, 'county'].strip()
-
-        npz_file_path = os.path.join(self.base_path, f'{county}', 'InD', f'{year}', f'{county}_{year}.npz')
-        loaded_data = np.load(npz_file_path, allow_pickle=True)["input"]
-        loaded_data = loaded_data.item()  # Convert the array to a dictionary
-        
-
-        landsat = loaded_data[crop_name]['landsat_data']
-        et = loaded_data[crop_name]['et_data']
-        climate = loaded_data[crop_name]['climate_data']
-        soil = loaded_data[crop_name]['soil_data']
-
-        # Original label
-        original_y = self.df.loc[idx]['yield']
-
-
-        # print(landsat.shape, et.shape, climate.shape, soil.shape, original_y)
-
-        return 
-    
-    def normalize(self):
-        
-    
-
-
-
-
-
-
-
 def get_dataloaders(
         batch_size:int, 
         exp_name: str): 
@@ -554,7 +670,6 @@ def get_dataloaders(
                                                     shuffle=False, num_workers=8) 
 
     return data_loader_training, data_loader_validate, data_loader_test
-
 
 class Sentinel_Dataset(Dataset):
     def __init__(self, df: pd.DataFrame):

@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torchvision.models as models
 
-from dataset.exceptions import InvalidBackboneError
+from src.exceptions import InvalidBackboneError
 
 
 # class ResNetSimCLR(nn.Module):

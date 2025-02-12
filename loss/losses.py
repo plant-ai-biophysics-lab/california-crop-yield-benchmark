@@ -39,21 +39,12 @@ class ContrastiveLoss(nn.Module):
 
         return loss
 
+def mse_loss(inputs, targets):
+    loss = (inputs - targets) ** 2
+    loss = torch.mean(loss)
+    
+    return loss
 
-
-# class ContrastiveLoss(nn.Module):
-#     def __init__(self, temperature=0.5):
-#         super().__init__()
-#         self.temperature = temperature
-
-#     def forward(self, features, batch_size):
-#         cos_sim = torch.matmul(features, features.T) / self.temperature
-#         labels = torch.range(batch_size).repeat(2) # Assuming pairs are arranged consecutively
-#         mask = labels.expand(batch_size, batch_size).eq(labels.expand(batch_size, batch_size).T)
-#         positive_samples = cos_sim.masked_select(mask).view(batch_size, -1)
-#         negative_samples = cos_sim.masked_select(~mask).view(batch_size, -1)
-#         losses = torch.cat([torch.logsumexp(negative_samples, dim=1), -torch.diag(positive_samples)], dim=0)
-#         return losses.mean()
     
 
     

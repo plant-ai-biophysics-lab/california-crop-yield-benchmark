@@ -347,7 +347,6 @@ class ProcessingYieldObs():
             "berries, strawberries, all": "Strawberries",
             "berries, strawberries, misc": "Strawberries",
             "bok choy": "Greens",
-            "brussels sprouts": "Brussels Sprouts",
             "chard": "Greens",
             "cilantro": "Herbs",
             "citrus, misc": "Citrus",
@@ -707,31 +706,23 @@ class ModelProcessedData:
         for crop_name in self.crop_names:
             # Get cultivated area for the current crop
             cdl_cultivated_data = self.get_cultivated_area(crop_name = crop_name)
-            # Initialize the crop-specific dictionary
-            crop_outputs = {}
+            if cdl_cultivated_data is not None:
 
-            # Compute requested outputs for this crop
-            if "landsat_data" in requested_outputs:
-                landsat = self.get_masked_landsat_timeseries(cdl_cultivated_data)
-                crop_outputs["landsat_data"] = landsat
-            if "et_data" in requested_outputs:
-                crop_outputs["et_data"] = self.get_masked_et_timeseries(cdl_cultivated_data)
-            if "climate_data" in requested_outputs:
-                crop_outputs["climate_data"] = self.get_climate_stack(cdl_cultivated_data, daily=daily_climate)
+                crop_outputs = {}
 
-            if "soil_data" in requested_outputs:
-                crop_outputs["soil_data"] = self.get_soil_dataset(cdl_cultivated_data)
+                if "landsat_data" in requested_outputs:
+                    landsat = self.get_masked_landsat_timeseries(cdl_cultivated_data)
+                    crop_outputs["landsat_data"] = landsat
+                if "et_data" in requested_outputs:
+                    crop_outputs["et_data"] = self.get_masked_et_timeseries(cdl_cultivated_data)
+                if "climate_data" in requested_outputs:
+                    crop_outputs["climate_data"] = self.get_climate_stack(cdl_cultivated_data, daily=daily_climate)
 
-            # Store the crop's output in the main dictionary
-            outputs[crop_name] = crop_outputs
+                if "soil_data" in requested_outputs:
+                    crop_outputs["soil_data"] = self.get_soil_dataset(cdl_cultivated_data)
+                outputs[crop_name] = crop_outputs
             
-            # except ValueError as e:
-            #     print(f"Warning: {e} - Skipping crop '{crop_name}'")
-
-        # # Return single output directly if only one crop was requested
-        # if len(self.crop_names) == 1:
-        #     return outputs[self.crop_names[0]]
-        # np.savez_compressed(self.output_dir , input = outputs)
+        np.savez_compressed(self.output_dir , input = outputs)
 
         return outputs
 
@@ -815,26 +806,29 @@ class ModelProcessedData:
             if not isinstance(crop_name, str):
                 raise ValueError("Crop name must be a string.")
 
+            
             # Get the corresponding crop code
             crop_code = next((code for code, name in cdl_crop_legend.items() if name == crop_name), None)
-            if crop_code is None:
-                raise ValueError(f"Invalid crop name: {crop_name}. Please check the crop legend.")
 
-            # Create a mask for the selected crop
-            mask = cdl_data == crop_code
-            cultivated_area = np.where(mask, cdl_data, 0)
+            # if crop_code is None:
+            #     raise ValueError(f"Invalid crop name: {crop_name}. Please check the crop legend.")
+            if crop_code is not None:
+                # Create a mask for the selected crop
 
-            # Align cultivated area to reference grid
-            bounds, crs, resolution = self.get_reference_grid()
-            aligned_cultivated_area, _, _ = self.align_to_geometry(
-                reference_bounds=bounds,
-                reference_crs=crs,
-                resolution=resolution,
-                source_data=np.expand_dims(cultivated_area, axis=0),
-                source_transform=cdl_transform,
-                source_crs=cdl_crs
-            )
-        return aligned_cultivated_area
+                mask = cdl_data == crop_code
+                cultivated_area = np.where(mask, cdl_data, 0)
+
+                # Align cultivated area to reference grid
+                bounds, crs, resolution = self.get_reference_grid()
+                aligned_cultivated_area, _, _ = self.align_to_geometry(
+                    reference_bounds=bounds,
+                    reference_crs=crs,
+                    resolution=resolution,
+                    source_data=np.expand_dims(cultivated_area, axis=0),
+                    source_transform=cdl_transform,
+                    source_crs=cdl_crs
+                )
+                return aligned_cultivated_area
     
     def get_masked_landsat_timeseries(self, cultivated_area):
         """
@@ -955,7 +949,7 @@ class ModelProcessedData:
 
         # Check if expected soil attributes exist
         existing_attributes = [attr for attr in soil_attributes if attr in muaggatt_df.columns]
-        print("Matched Soil Attributes in Data:", existing_attributes)
+        # print("Matched Soil Attributes in Data:", existing_attributes)
 
         # Ensure "mukey" column exists before setting index
         if "mukey" not in muaggatt_df.columns:

@@ -3,7 +3,7 @@ import pandas as pd
 
 
 
-for year in range(2008, 2023):
+for year in range(2015, 2023):
     if year != 2012: 
         m = pd.read_csv(f'/data2/hkaman/Data/FoundationModel/Monterey/InD/{year}/yield_{year}.csv')
         # Group by 'key_crop_name', summing 'yield' and collecting 'crop_name' into a list

@@ -5,7 +5,7 @@ import torch
 import cv2
 from torchvision.transforms import transforms
 from torchvision import transforms
-from dataset.exceptions import InvalidDatasetSelection
+from src.exceptions import InvalidDatasetSelection
 from torch.utils.data import Dataset
 from einops import rearrange
 from src.configs import set_seed
