@@ -40,59 +40,6 @@ def init_(tensor):
 
 
 
-
-# class LandsatEmbed(nn.Module):
-#     """ Image to Time-Series Token Embedding using Conv1D """
-
-#     def __init__(self, embed_dim, in_channels, time_steps, proj_dropout):
-#         super().__init__()
-
-#         self.embed_dim = embed_dim
-#         self.in_channels = in_channels  # Spectral bands (C)
-#         self.index = time_steps  # Time index multiplier
-
-#         # 1D Convolution to extract features for each spectral channel
-#         self.conv = nn.Conv1d(in_channels = self.in_channels, out_channels=self.embed_dim, kernel_size=1)
-
-#         # Positional Encoding for Time-Series Tokens
-#         self.position_embeddings = nn.Parameter(torch.zeros(1, self.index + 1, embed_dim))
-#         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
-#         self.dropout = nn.Dropout(proj_dropout)
-#         self.norm = nn.LayerNorm(embed_dim)
-
-#     def forward(self, x):
-#         """
-#         x: (B, T, C, N) where:
-#             B = batch size
-#             T = time steps
-#             C = spectral bands (channels)
-#             N = number of vectorized pixels
-
-#         Output: (B, Index * C, EmbedDim)
-#         """
-
-#         B, T, C, N = x.shape  # Expecting (B, T, C, N)
-
-#         # Reshape input: process each channel separately by flattening across batch and time
-#         x = x.reshape(B * T, C, N)  # (B*T, C, N)
-
-#         # Ensure 1D Conv input is in (B, C, L) format
-#         x = self.conv(x)  # (B*C, EmbedDim, N)
-
-#         # Global Average Pooling over N (spatial pixels)
-#         x = x.mean(dim=-1)  # (B*T, EmbedDim)
-
-#         # Reshape back to (B, C, EmbedDim)
-#         x = x.view(B, T, self.embed_dim)
-#         x = self.norm(x)
-
-
-#         cls_tokens = self.cls_token.expand(B, -1, -1)
-#         x = torch.cat((cls_tokens, x), dim=1) + self.position_embeddings
-#         x = self.dropout(x)
-
-#         return x  # Output shape: (B, Index * C, EmbedDim)
-
 class LandsatEmbed(nn.Module):
     """ Image to Time-Series Token Embedding using Linear Projection """
 
@@ -100,13 +47,11 @@ class LandsatEmbed(nn.Module):
         super().__init__()
 
         self.embed_dim = embed_dim
-        self.in_channels = in_channels  # Spectral bands (C)
-        self.index = time_steps  # Time index multiplier
+        self.in_channels = in_channels  
+        self.index = time_steps  
 
-        # Replacing Conv1D with a Linear layer
-        self.linear_proj = nn.Linear(self.in_channels, self.embed_dim)
+        self.linear_proj = nn.Linear(self.in_channels*128, self.embed_dim)
 
-        # Positional Encoding for Time-Series Tokens
         self.position_embeddings = nn.Parameter(torch.zeros(1, self.index + 1, embed_dim))
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.dropout = nn.Dropout(proj_dropout)
@@ -122,73 +67,21 @@ class LandsatEmbed(nn.Module):
 
         Output: (B, Index * C, EmbedDim)
         """
+        B, T, C, N = x.shape  
+        # mask = x != -9999 
+        # valid_x = torch.where(mask, x, torch.tensor(0.0, device=x.device))  
+        # x = valid_x.mean(dim=-1, keepdim=True)  
+        x = x.reshape(B * T, C*N)  
+        x = self.linear_proj(x) 
+        x = x.view(B, T, self.embed_dim)
 
-        B, T, C, N = x.shape  # Expecting (B, T, C, N)
-
-        # Reshape input: (B, T, C, N) → (B*T*N, C)
-        x = x.permute(0, 1, 3, 2).reshape(B * T * N, C)  # (B*T*N, C)
-
-        # Apply Linear Projection
-        x = self.linear_proj(x)  # (B*T*N, EmbedDim)
-
-        # Reshape back: (B, T, N, EmbedDim)
-        x = x.view(B, T, N, self.embed_dim)
-
-        # Global Average Pooling over N (spatial pixels)
-        x = x.mean(dim=2)  # (B, T, EmbedDim)
-
-        # Apply LayerNorm
         x = self.norm(x)
-
-        # Add CLS token and position embeddings
         cls_tokens = self.cls_token.expand(B, -1, -1)
         x = torch.cat((cls_tokens, x), dim=1) + self.position_embeddings
         x = self.dropout(x)
 
-        return x  # Output shape: (B, Index * C, EmbedDim)
+        return x  
     
-# class ETEmbed(nn.Module):
-#     """ Image to Time-Series Embedding using Conv1D """
-
-#     def __init__(self, embed_dim, in_channels, time_steps, proj_dropout):
-#         super().__init__()
-
-#         self.embed_dim = embed_dim
-#         self.in_channels = in_channels  # Spectral bands (C)
-
-#         # 1D Convolution to extract features across spectral channels
-#         self.conv = nn.Conv1d(in_channels = self.in_channels, out_channels=self.embed_dim, kernel_size=1)
-
-#         # Positional Encoding for Time-Series Representation
-#         self.position_embeddings = nn.Parameter(torch.zeros(1, time_steps + 1, embed_dim))
-#         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
-#         self.dropout = nn.Dropout(proj_dropout)
-#         self.norm = nn.LayerNorm(embed_dim)
-
-#     def forward(self, x):
-#         """
-#         x: (B, T, C, N) where:
-#             B = batch size
-#             T = time steps
-#             C = spectral bands (channels)
-#             N = variable number of vectorized pixels
-#         """
-
-#         B, T, C, N = x.shape
-#         x = x.reshape(B * T, C, N)  
-#         x = self.conv(x)  # Merge B and T for independent processing
-#         x = x.mean(dim=-1)  # Global Average Pooling over pixels (N) → (B * T, Embed)
-
-#         # Reshape back to (B, T, Embed)
-#         x = x.view(B, T, self.embed_dim)
-
-#         x = self.norm(x)
-#         cls_tokens = self.cls_token.expand(B, -1, -1)
-#         x = torch.cat((cls_tokens, x), dim=1) + self.position_embeddings
-#         x = self.dropout(x)
-
-#         return x  # Output shape: (B, T, Embed)
-
 class ETEmbed(nn.Module):
     """ Image to Time-Series Embedding using Linear Projection """
 
@@ -199,7 +92,7 @@ class ETEmbed(nn.Module):
         self.in_channels = in_channels  # Spectral bands (C)
 
         # Linear layer replacing Conv1D
-        self.linear_proj = nn.Linear(self.in_channels, self.embed_dim)
+        self.linear_proj = nn.Linear(self.in_channels*128, self.embed_dim)
 
         # Positional Encoding for Time-Series Representation
         self.position_embeddings = nn.Parameter(torch.zeros(1, time_steps + 1, embed_dim))
@@ -216,29 +109,20 @@ class ETEmbed(nn.Module):
             N = variable number of vectorized pixels
         """
 
-        B, T, C, N = x.shape  # Expecting (B, T, C, N)
-
-        # Reshape input: (B, T, C, N) → (B*T*N, C)
-        x = x.permute(0, 1, 3, 2).reshape(B * T * N, C)  # (B*T*N, C)
-
-        # Apply Linear Projection
-        x = self.linear_proj(x)  # (B*T*N, EmbedDim)
-
-        # Reshape back: (B, T, N, EmbedDim)
-        x = x.view(B, T, N, self.embed_dim)
-
-        # Global Average Pooling over N (spatial pixels)
-        x = x.mean(dim=2)  # (B, T, EmbedDim)
-
-        # Apply LayerNorm
+        B, T, C, N = x.shape  
+        # mask = x != -9999 
+        # valid_x = torch.where(mask, x, torch.tensor(0.0, device=x.device))  
+        # x = valid_x.mean(dim=-1, keepdim=True)  
+ 
+        x = x.permute(0, 1, 3, 2).reshape(B * T, C*N)  
+        x = self.linear_proj(x) 
+        x = x.view(B, T, self.embed_dim)
         x = self.norm(x)
-
-        # Add CLS token and position embeddings
         cls_tokens = self.cls_token.expand(B, -1, -1)
         x = torch.cat((cls_tokens, x), dim=1) + self.position_embeddings
         x = self.dropout(x)
 
-        return x  # Output shape: (B, T, EmbedDim)
+        return x  
     
 class SoilEmbed(nn.Module):
     """ Soil Data to Time-Series Embedding using Conv1D with Time Expansion """
@@ -247,13 +131,11 @@ class SoilEmbed(nn.Module):
         super().__init__()
 
         self.embed_dim = embed_dim
-        self.in_channels = 5  # Number of soil features (C)
-        self.time_steps = time_steps  # Fixed to 12
+        self.in_channels = in_channels  #
+        self.time_steps = time_steps  
 
-        # 1D Convolution to extract features across soil properties
-        self.conv = nn.Conv1d(in_channels = 1, out_channels=self.embed_dim, kernel_size=1)
+        self.conv = nn.Conv1d(in_channels = 128, out_channels=self.embed_dim, kernel_size=1)
 
-        # Positional Encoding for Time-Series Representation
         self.position_embeddings = nn.Parameter(torch.zeros(1, self.in_channels + 1, embed_dim))
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.dropout = nn.Dropout(proj_dropout)
@@ -269,70 +151,19 @@ class SoilEmbed(nn.Module):
             N = number of vectorized soil samples
         """
 
-        B, T, C, N = x.shape  # Expecting T=1 initially
+        B, T, C, N = x.shape  
+        # mask = x != -9999 
+        # valid_x = torch.where(mask, x, torch.tensor(0.0, device=x.device))  
+        # x = valid_x.mean(dim=-1, keepdim=True)  
 
-        x = self.conv(x.view(B * C, T, N))
-        x = x.mean(dim=-1)  # Global Average Pooling over pixels (N) → (B * T, Embed)
-
-        x = x.view(B, C, self.embed_dim)
+        x = self.conv(x.view(B, N, C))  
+        x = x.permute(0, 2, 1)
         x = self.norm(x)
         cls_tokens = self.cls_token.expand(B, -1, -1)
         x = torch.cat((cls_tokens, x), dim=1) + self.position_embeddings
         x = self.dropout(x)
 
         return x  
-
-# class SoilEmbed(nn.Module):
-#     """ Soil Data to Time-Series Embedding using Linear Projection """
-
-#     def __init__(self, embed_dim, in_channels, time_steps, proj_dropout):
-#         super().__init__()
-
-#         self.embed_dim = embed_dim
-#         self.in_channels = in_channels  # Soil properties (C)
-#         self.time_steps = time_steps  # Fixed to 12
-
-#         # Linear projection instead of Conv1D
-#         self.linear_proj = nn.Linear(self.in_channels, self.embed_dim)
-
-#         # Positional Encoding for Time-Series Tokens
-#         self.position_embeddings = nn.Parameter(torch.zeros(1, self.in_channels + 1, embed_dim))
-#         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
-#         self.dropout = nn.Dropout(proj_dropout)
-#         self.norm = nn.LayerNorm(embed_dim)
-
-#     def forward(self, x):
-#         """
-#         x: (B, 1, C, N) where:
-#             B = batch size
-#             1 = single time step (soil is static)
-#             C = soil properties (features)
-#             N = number of vectorized soil samples
-#         """
-
-#         B, T, C, N = x.shape  # Expecting T=1 initially
-
-#         # Ensure x maintains 4D shape
-#         x = x.view(B, C, T, N)  # (B, C, 1, N)
-
-#         # Reshape input: (B, C, 1, N) → (B*N, C)
-#         x = x.permute(0, 2, 1, 3).reshape(B * N, C)  # (B*N, C)
-
-#         # Apply Linear Projection
-#         x = self.linear_proj(x)  # (B*N, EmbedDim)
-
-#         # Reshape back: (B, N, EmbedDim)
-#         x = x.view(B, N, self.embed_dim)
-
-#         # Apply LayerNorm
-#         x = self.norm(x)
-#         print(f"soil 0: {x.shape}")
-#         # Add CLS token and position embeddings
-#         cls_tokens = self.cls_token.expand(B, -1, -1)
-#         x = torch.cat((cls_tokens, x), dim=1) + self.position_embeddings
-#         x = self.dropout(x)
-#         print(f"soil: {x.shape}")
-#         return x  # Output shape: (B, C+1, EmbedDim)
 
 class ClimateEmbed(nn.Module):
     """ Climate Data to Time-Series Embedding using Conv1D """
@@ -347,7 +178,7 @@ class ClimateEmbed(nn.Module):
 
         # 1D Convolution for temporal downsampling per variable (C)
         self.conv = nn.Conv1d(
-            in_channels=1,  # Single variable at a time
+            in_channels=128,  # Single variable at a time
             out_channels=self.embed_dim, 
             kernel_size=self.downsample_factor, 
             stride=self.downsample_factor
@@ -370,101 +201,30 @@ class ClimateEmbed(nn.Module):
         Output: (B, (C * time_steps) + 1, EmbedDim)
         """
 
-        B, T_full, C, M = x.shape  # Expecting T_full=365
+        B, T, C, M = x.shape  
+        # mask = x != -9999 
+        # valid_x = torch.where(mask, x, torch.tensor(0.0, device=x.device))  
+        # x = valid_x.mean(dim=-1, keepdim=True)  
 
-        # Step 1: Keep only required time steps
-        x = x[:, :self.time_steps * self.downsample_factor]  # (B, T_needed, C, M)
-
-        # Step 2: Reshape for Conv1D (B, C, time_steps, days_per_month, M)
         x = x.view(B, self.time_steps, self.downsample_factor, C, M)
-        
-        # Step 3: Process each variable separately (B, C, time_steps, days_per_month, M)
-        x = x.permute(0, 3, 1, 2, 4).reshape(B * C * self.time_steps, 1, self.downsample_factor * M)  # (B*C*T, 1, L)
+        x = x.permute(0, 3, 1, 2, 4).reshape(B * C * self.time_steps, M, self.downsample_factor * 1)  # (B*C*T, 1, L)
+        x = self.conv(x)  
 
-        # Step 4: Apply Conv1D over time
-        x = self.conv(x)  # (B*C*T, EmbedDim, L_reduced)
-
-        # Step 5: Global Average Pooling over reduced sequence
-        x = x.mean(dim=-1)  # (B*C*T, EmbedDim)
-
-        # Step 6: Reshape back to (B, C, time_steps, EmbedDim)
+        # Global Average Pooling over reduced sequence
+        x = x.mean(dim=-1)  
+        # Reshape back to (B, C, time_steps, EmbedDim)
         x = x.view(B, C, self.time_steps, self.embed_dim)
-
-        # Step 7: Flatten time and variables → (B, C*T, EmbedDim)
+        # Flatten time and variables → (B, C*T, EmbedDim)
         x = x.permute(0, 2, 1, 3).reshape(B, C * self.time_steps, self.embed_dim)
 
-        # Step 8: Normalize
-        x = self.norm(x)
 
-        # Step 9: Add CLS token and position embeddings
+        x = self.norm(x)
         cls_tokens = self.cls_token.expand(B, -1, -1)
         x = torch.cat((cls_tokens, x), dim=1) + self.position_embeddings
 
-        # Step 10: Apply dropout
         x = self.dropout(x)
 
-        return x  # Output shape: (B, (C * time_steps) + 1, EmbedDim)
-
-
-# class ClimateEmbed(nn.Module):
-#     """ Climate Data to Time-Series Embedding using Linear Projection """
-
-#     def __init__(self, embed_dim, in_channels, time_steps, proj_dropout, downsample_factor):
-#         super().__init__()
-
-#         self.embed_dim = embed_dim
-#         self.in_channels = in_channels  # Number of climate variables (C)
-#         self.time_steps = time_steps  # Number of months (1 to 12)
-#         self.downsample_factor = downsample_factor  # Downsample from 365 → time_steps
-
-#         # Linear layer replacing Conv1D for temporal downsampling
-#         self.linear_proj = nn.Linear(self.downsample_factor * in_channels, self.embed_dim)
-
-#         # Positional Encoding for Time-Series Tokens
-#         self.position_embeddings = nn.Parameter(torch.zeros(1, (self.time_steps * self.in_channels) + 1, embed_dim))
-#         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
-#         self.dropout = nn.Dropout(proj_dropout)
-#         self.norm = nn.LayerNorm(embed_dim)
-
-#     def forward(self, x):
-#         """
-#         x: (B, 365, C, M) where:
-#             B = batch size
-#             365 = daily climate observations
-#             C = climate variables (features)
-#             M = number of spatial locations
-
-#         Output: (B, (C * time_steps) + 1, EmbedDim)
-#         """
-#         print(f"original: {x.shape}")
-#         B, T, C, M = x.shape  
-#         x = x.view(B, self.time_steps, T, C, M)
-#         print(f"0 : {x.shape}")
-#         x = x.permute(0, 1, 4, 2, 3).reshape(B * C * self.time_steps, T * M)  
-#         print(f" init: {x.shape}")
-
-#         x = self.linear_proj(x)  
-
-#         # x = x.view(B, C, self.time_steps, self.embed_dim)
-
-
-#         # x = x.mean(dim=1)  # (B, time_steps, EmbedDim)
-
-
-#         x = x.view(B, self.time_steps * C, self.embed_dim)
-
-
-#         x = self.norm(x)
-
-
-#         cls_tokens = self.cls_token.expand(B, -1, -1)
-#         x = torch.cat((cls_tokens, x), dim=1) + self.position_embeddings
-
-
-#         x = self.dropout(x)
-
-#         return x 
-    
+        return x 
 
 class MultiModalEmbed(nn.Module):
     def __init__(self, config: Union[Dict], time_step: int):
@@ -635,7 +395,9 @@ class MultiRegressionHead(nn.Module):
 
         out = []
         for x in x_list:
+
             x = self.regression.norm(x)
             x = self.regression.lfc(x)
+
             out.append(x)
         return out

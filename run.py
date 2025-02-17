@@ -14,7 +14,7 @@ import argparse
 def main(args):
 
     data_loader_training, data_loader_validate, data_loader_test = dataloader(
-    county_name='Monterey', batch_size = 1
+    county_name='Monterey', batch_size = args.batch_size
     )
 
     config = Configs(
@@ -45,6 +45,17 @@ def main(args):
         wd =  args.wd, 
         epochs=  args.epochs)
 
+    M.predict(model = yieldbenchmark, 
+              data_loader = data_loader_training, 
+              category = 'train')
+    
+    M.predict(model = yieldbenchmark, 
+              data_loader = data_loader_validate, 
+              category = 'valid')
+    
+    M.predict(model = yieldbenchmark, 
+              data_loader = data_loader_test, 
+              category = 'test')
 
 if __name__ == "__main__":
 
@@ -64,7 +75,7 @@ if __name__ == "__main__":
     parser.add_argument("--timeseries", type=str, default = True, help = "Timeseries defult")
     parser.add_argument("--lr", type=float, default = 0.0001, help = "Learning rate")
     parser.add_argument("--wd", type=float, default = 0.0001, help = "Value of weight decay")
-    parser.add_argument("--epochs", type=int, default = 100, help = "The number of epochs")
+    parser.add_argument("--epochs", type=int, default = 50, help = "The number of epochs")
     parser.add_argument("--loss", type=str, default = "mse", help = "Loss function")
     parser.add_argument("--optimizer", type=str, default = "adamw", help = "Optimizer")
 

@@ -1,52 +1,123 @@
 nohup: ignoring input
 Monterey | train = 156, valid = 36, test = 35
-Model Parameteres: 19694081  
+Model Parameteres: 49345025  
 ****************************************************************
-Traceback (most recent call last):
-  File "/home/hkaman/Documents/foundational-model-ca-cdl/run.py", line 74, in <module>
-    main(args)
-  File "/home/hkaman/Documents/foundational-model-ca-cdl/run.py", line 38, in main
-    M.train(
-  File "/home/hkaman/Documents/foundational-model-ca-cdl/utils/misc.py", line 240, in train
-    list_ytrain_pred = model(                    
-                       ^^^^^^
-  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hkaman/Documents/foundational-model-ca-cdl/src/YieldB.py", line 107, in forward
-    out = self.time_series(
-          ^^^^^^^^^^^^^^^^^
-  File "/home/hkaman/Documents/foundational-model-ca-cdl/src/YieldB.py", line 92, in time_series
-    l_embed , et_embed, climate_embed, soil_embed = mmt_embed(landsat_t, et_t, climate_t, soil)
-                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hkaman/Documents/foundational-model-ca-cdl/src/attention.py", line 506, in forward
-    l_embed = self.landsat(landsat)  
-              ^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hkaman/Documents/foundational-model-ca-cdl/src/attention.py", line 132, in forward
-    x = self.linear_proj(x)  # (B*T*N, EmbedDim)
-        ^^^^^^^^^^^^^^^^^^^
-  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/torch/nn/modules/linear.py", line 114, in forward
-    return F.linear(input, self.weight, self.bias)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 1.32 GiB. GPU 0 has a total capacty of 23.65 GiB of which 435.75 MiB is free. Including non-PyTorch memory, this process has 21.47 GiB memory in use. Of the allocated memory 18.53 GiB is allocated by PyTorch, and 1.78 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF
+Epoch 001 [204.241 (s)]: Train MSE Loss: 24673.7894 | Val MSE Loss: 22737.9530
+=============================== Best model Saved! Val MSE: 22737.9530
+count: 0
+Epoch 002 [191.785 (s)]: Train MSE Loss: 22374.3171 | Val MSE Loss: 21188.2707
+=============================== Best model Saved! Val MSE: 21188.2707
+count: 0
+Epoch 003 [202.570 (s)]: Train MSE Loss: 20959.5437 | Val MSE Loss: 19931.7893
+=============================== Best model Saved! Val MSE: 19931.7893
+count: 0
+Epoch 004 [203.653 (s)]: Train MSE Loss: 19834.0003 | Val MSE Loss: 19134.3391
+=============================== Best model Saved! Val MSE: 19134.3391
+count: 0
+Epoch 005 [192.857 (s)]: Train MSE Loss: 19104.7800 | Val MSE Loss: 18582.3191
+=============================== Best model Saved! Val MSE: 18582.3191
+count: 0
+Epoch 006 [198.527 (s)]: Train MSE Loss: 18653.9107 | Val MSE Loss: 18252.3816
+=============================== Best model Saved! Val MSE: 18252.3816
+count: 0
+Epoch 007 [199.918 (s)]: Train MSE Loss: 18336.1955 | Val MSE Loss: 18022.2830
+=============================== Best model Saved! Val MSE: 18022.2830
+count: 0
+Epoch 008 [191.180 (s)]: Train MSE Loss: 18187.9156 | Val MSE Loss: 17905.8185
+=============================== Best model Saved! Val MSE: 17905.8185
+count: 0
+Epoch 009 [196.203 (s)]: Train MSE Loss: 18104.8336 | Val MSE Loss: 17843.4600
+=============================== Best model Saved! Val MSE: 17843.4600
+count: 0
+Epoch 010 [202.079 (s)]: Train MSE Loss: 17929.2722 | Val MSE Loss: 17884.2339
+count: 1
+Epoch 011 [193.787 (s)]: Train MSE Loss: 18113.6477 | Val MSE Loss: 17771.5861
+=============================== Best model Saved! Val MSE: 17771.5861
+count: 0
+Epoch 012 [196.544 (s)]: Train MSE Loss: 17849.8802 | Val MSE Loss: 17759.0624
+=============================== Best model Saved! Val MSE: 17759.0624
+count: 0
+Epoch 013 [200.685 (s)]: Train MSE Loss: 17873.3916 | Val MSE Loss: 17759.4896
+count: 1
+Epoch 014 [207.198 (s)]: Train MSE Loss: 17829.5575 | Val MSE Loss: 17736.3166
+=============================== Best model Saved! Val MSE: 17736.3166
+count: 0
+Epoch 015 [204.466 (s)]: Train MSE Loss: 18027.7598 | Val MSE Loss: 17730.8177
+=============================== Best model Saved! Val MSE: 17730.8177
+count: 0
+Epoch 016 [209.252 (s)]: Train MSE Loss: 17889.7895 | Val MSE Loss: 17761.0868
+count: 1
+Epoch 017 [205.269 (s)]: Train MSE Loss: 17847.5678 | Val MSE Loss: 17702.0986
+=============================== Best model Saved! Val MSE: 17702.0986
+count: 0
+Epoch 018 [201.454 (s)]: Train MSE Loss: 17796.1295 | Val MSE Loss: 17709.7908
+count: 1
+Epoch 019 [205.660 (s)]: Train MSE Loss: 17820.1194 | Val MSE Loss: 17807.6687
+count: 2
+Epoch 020 [190.193 (s)]: Train MSE Loss: 18035.4102 | Val MSE Loss: 17706.0702
+count: 3
+Epoch 021 [184.933 (s)]: Train MSE Loss: 17808.4315 | Val MSE Loss: 17705.5078
+count: 4
+Epoch 022 [192.392 (s)]: Train MSE Loss: 17767.7533 | Val MSE Loss: 17702.3940
+count: 5
+Epoch 023 [191.784 (s)]: Train MSE Loss: 17780.5616 | Val MSE Loss: 17708.7294
+count: 6
+Epoch 024 [204.188 (s)]: Train MSE Loss: 17819.4270 | Val MSE Loss: 17851.7238
+count: 7
+Epoch 025 [217.955 (s)]: Train MSE Loss: 17893.9214 | Val MSE Loss: 18015.3488
+count: 8
+Epoch 026 [203.503 (s)]: Train MSE Loss: 17839.5388 | Val MSE Loss: 17691.2372
+=============================== Best model Saved! Val MSE: 17691.2372
+count: 0
+Epoch 027 [201.311 (s)]: Train MSE Loss: 17791.8362 | Val MSE Loss: 17707.9492
+count: 1
+Epoch 028 [190.873 (s)]: Train MSE Loss: 17851.7304 | Val MSE Loss: 17703.8632
+count: 2
+Epoch 029 [205.956 (s)]: Train MSE Loss: 17780.3599 | Val MSE Loss: 17847.4994
+count: 3
+Epoch 030 [192.010 (s)]: Train MSE Loss: 17851.1456 | Val MSE Loss: 17786.2391
+count: 4
+Epoch 031 [203.722 (s)]: Train MSE Loss: 17827.9989 | Val MSE Loss: 17777.4541
+count: 5
+Epoch 032 [191.477 (s)]: Train MSE Loss: 17766.4617 | Val MSE Loss: 17748.4563
+count: 6
+Epoch 033 [200.765 (s)]: Train MSE Loss: 17833.4386 | Val MSE Loss: 17702.0481
+count: 7
+Epoch 034 [206.312 (s)]: Train MSE Loss: 17830.3792 | Val MSE Loss: 17728.5670
+count: 8
+Epoch 035 [200.759 (s)]: Train MSE Loss: 17820.0720 | Val MSE Loss: 17704.5316
+count: 9
+Epoch 036 [190.890 (s)]: Train MSE Loss: 17793.5343 | Val MSE Loss: 17704.5390
+count: 10
+Epoch 037 [207.954 (s)]: Train MSE Loss: 17758.1082 | Val MSE Loss: 17729.5101
+count: 11
+Epoch 038 [197.847 (s)]: Train MSE Loss: 17833.4412 | Val MSE Loss: 17736.2177
+count: 12
+Epoch 039 [199.472 (s)]: Train MSE Loss: 17756.6445 | Val MSE Loss: 17701.2635
+count: 13
+Epoch 040 [183.526 (s)]: Train MSE Loss: 17882.6615 | Val MSE Loss: 17720.6036
+count: 14
+Epoch 041 [216.411 (s)]: Train MSE Loss: 17792.0118 | Val MSE Loss: 17717.5690
+count: 15
+Epoch 042 [199.169 (s)]: Train MSE Loss: 17785.9854 | Val MSE Loss: 17689.0543
+=============================== Best model Saved! Val MSE: 17689.0543
+count: 0
+Epoch 043 [199.481 (s)]: Train MSE Loss: 17786.3400 | Val MSE Loss: 17828.0773
+count: 1
+Epoch 044 [201.708 (s)]: Train MSE Loss: 17841.8795 | Val MSE Loss: 17726.2774
+count: 2
+Epoch 045 [188.105 (s)]: Train MSE Loss: 17700.6079 | Val MSE Loss: 17898.9187
+count: 3
+Epoch 046 [204.388 (s)]: Train MSE Loss: 18046.2793 | Val MSE Loss: 17922.6197
+count: 4
+Epoch 047 [201.598 (s)]: Train MSE Loss: 17814.6137 | Val MSE Loss: 17736.2979
+count: 5
+Epoch 048 [184.042 (s)]: Train MSE Loss: 17875.8919 | Val MSE Loss: 17762.9533
+count: 6
+Epoch 049 [183.271 (s)]: Train MSE Loss: 17708.1219 | Val MSE Loss: 17978.8789
+count: 7
+Epoch 050 [197.196 (s)]: Train MSE Loss: 17978.4061 | Val MSE Loss: 17927.7901
+count: 8
+train inference is done!
+validation inference is done!
+test inference is done!

@@ -72,11 +72,11 @@ def dataloader(county_name: str = 'Monterey', batch_size: int = 8):
 
 
     data_loader_training = torch.utils.data.DataLoader(dataset_training, batch_size= batch_size, 
-                                                    shuffle=True, collate_fn=custom_collate, num_workers=8)  #
+                                                    shuffle=True,  num_workers=8)  #collate_fn=custom_collate,
     data_loader_validate = torch.utils.data.DataLoader(dataset_validate, batch_size= batch_size, 
-                                                    shuffle=False, collate_fn=custom_collate, num_workers=8)  
+                                                    shuffle=False,  num_workers=8)  
     data_loader_test     = torch.utils.data.DataLoader(dataset_test, batch_size=batch_size, 
-                                                    shuffle=False, collate_fn=custom_collate, num_workers=8) 
+                                                    shuffle=False, num_workers=8) 
 
     return data_loader_training, data_loader_validate, data_loader_test
 
@@ -84,106 +84,182 @@ class DataGen(Dataset):
     def __init__(self, df: pd.DataFrame):
         self.df = df
         self.base_path = '/data2/hkaman/Data/FoundationModel'
+        self.target_dim = 128  # Fixed target dimension
+
+        # Define fixed transformation matrices
+        self.weights = {
+            "landsat": np.random.randn(6, self.target_dim),  # (6, 128)
+            "et": np.random.randn(1, self.target_dim),  # (1, 128)
+            "climate": np.random.randn(8, self.target_dim),  # (8, 128)
+            "soil": np.random.randn(5, self.target_dim)  # (5, 128)
+        }
 
     def __len__(self):
         return len(self.df)
 
     def standardized(self, data):
-        return data  # Placeholder for standardization
+        """
+        Standardizes input data.
+        """
+        T, B, N = data.shape
+        data = np.nan_to_num(data, nan=0.0)
+        mean_per_band = np.mean(data, axis=(0, 2), keepdims=True)  
+        std_per_band = np.std(data, axis=(0, 2), keepdims=True) + 1e-10  
+        standardized = (data - mean_per_band) / std_per_band  
+        return np.nan_to_num(standardized, nan=0.0)
+    
+
+    def linear_transform(self, tensor):
+        """ Applies a fixed linear transformation to the last dimension (spatial dimension N or M). """
+        tensor = np.asarray(tensor, dtype=np.float32)  
+
+        T, B, N = tensor.shape  
+        weight = np.random.randn(N, 128).astype(np.float32)  
+        tensor_reshaped = tensor.reshape(T * B, N) 
+        # print(tensor_reshaped.shape, weight.shape) 
+        transformed = np.matmul(tensor_reshaped, weight)  
+        transformed = transformed.reshape(T, B, 128)
+        return transformed  
+    
+
+    def mean_reduce(self, tensor):
+        """ Computes the mean across the last dimension. """
+        tensor = np.asarray(tensor, dtype=np.float32)
+        return np.mean(tensor, axis=-1, keepdims=True)  # Shape becomes (X, Y, 1)
 
     def __getitem__(self, idx):
-        """ Fetches the sample only if it's valid """
-        # actual_idx = self.valid_indices[idx]  # Map to the original dataset index
-
+        """ Fetches a single sample and applies transformations. """
         year = self.df.loc[idx, 'year']
         crop_name = self.df.loc[idx, 'key_crop_name'].strip()
         county = self.df.loc[idx, 'county'].strip()
 
         npz_file_path = os.path.join(self.base_path, f'{county}', 'InD', f'{year}', f'{county}_{year}.npz')
         loaded_data = np.load(npz_file_path, allow_pickle=True)["input"].item()
-  
+
+        # Standardize inputs
         landsat = self.standardized(loaded_data[crop_name]['landsat_data'])  # (12, 6, N)
-        # landsat = torch.as_tensor(landsat, dtype=torch.float32)
-
         et = self.standardized(loaded_data[crop_name]['et_data'][:, :1, :])  # (12, 1, N)
-        # et = torch.as_tensor(et, dtype=torch.float32)
-
         climate = self.standardized(loaded_data[crop_name]['climate_data'])  # (365, 8, M)
-        # climate = torch.as_tensor(climate, dtype=torch.float32)
-
         soil = self.standardized(loaded_data[crop_name]['soil_data'].reshape(1, 5, -1))  # (1, 5, N)
-        # soil = torch.as_tensor(soil, dtype=torch.float32)
 
+        # Apply transformations
+        landsat_linear =  torch.tensor(self.linear_transform(landsat), dtype=torch.float32)  # (12, 6, 128)
+        et_linear =  torch.tensor(self.linear_transform(et), dtype=torch.float32)  # (12, 1, 128)
+        climate_linear =  torch.tensor(self.linear_transform(climate), dtype=torch.float32)  # (365, 8, 128)
+        soil_linear =  torch.tensor(self.linear_transform(soil), dtype=torch.float32)  # (1, 5, 128)
 
-        original_y = self.df.loc[idx]['yield']
-        # original_y = torch.as_tensor(original_y, dtype=torch.float32)
+        landsat_mean =  torch.tensor(self.mean_reduce(landsat), dtype=torch.float32)  # (12, 6, 1)
+        et_mean =  torch.tensor(self.mean_reduce(et), dtype=torch.float32)  # (12, 1, 1)
+        climate_mean =  torch.tensor(self.mean_reduce(climate), dtype=torch.float32)  # (365, 8, 1)
+        soil_mean =  torch.tensor(self.mean_reduce(soil), dtype=torch.float32)  # (1, 5, 1)
+
+        # Fetch yield target
+        original_y = torch.tensor(self.df.loc[idx]['yield'], dtype=torch.float32)
 
         sample = {
             "year": year, 
             "county": county, 
             "crop_name": crop_name,
-            "satellite": landsat,
-            "et": et,
-            "climate": climate,
-            "soil": soil,
+            "landsat_linear": landsat_linear,
+            "et_linear": et_linear,
+            "climate_linear": climate_linear,
+            "soil_linear": soil_linear,
+            "landsat_mean": landsat_mean,
+            "et_mean": et_mean,
+            "climate_mean": climate_mean,
+            "soil_mean": soil_mean,
             "yield": original_y
         }
+
         return sample
     
-    def standardized(self, array):
-        """
-        Standardize and normalize Landsat time series imagery.
+
+# class DataGen(Dataset):
+#     def __init__(self, df: pd.DataFrame):
+#         self.df = df
+#         self.base_path = '/data2/hkaman/Data/FoundationModel'
+
+#     def __len__(self):
+#         return len(self.df)
+
+#     def standardized(self, data):
+#         return data  # Placeholder for standardization
+
+#     def __getitem__(self, idx):
+#         """ Fetches the sample only if it's valid """
+#         # actual_idx = self.valid_indices[idx]  # Map to the original dataset index
+
+#         year = self.df.loc[idx, 'year']
+#         crop_name = self.df.loc[idx, 'key_crop_name'].strip()
+#         county = self.df.loc[idx, 'county'].strip()
+
+#         npz_file_path = os.path.join(self.base_path, f'{county}', 'InD', f'{year}', f'{county}_{year}.npz')
+#         loaded_data = np.load(npz_file_path, allow_pickle=True)["input"].item()
+  
+#         landsat = self.standardized(loaded_data[crop_name]['landsat_data'])  # (12, 6, N)
+#         # landsat = torch.as_tensor(landsat, dtype=torch.float32)
+
+#         et = self.standardized(loaded_data[crop_name]['et_data'][:, :1, :])  # (12, 1, N)
+#         # et = torch.as_tensor(et, dtype=torch.float32)
+
+#         climate = self.standardized(loaded_data[crop_name]['climate_data'])  # (365, 8, M)
+#         # climate = torch.as_tensor(climate, dtype=torch.float32)
+
+#         soil = self.standardized(loaded_data[crop_name]['soil_data'].reshape(1, 5, -1))  # (1, 5, N)
+#         # soil = torch.as_tensor(soil, dtype=torch.float32)
+
+#         if np.isnan(landsat).any():
+#             print(" DataLoader Warning: NaN values detected in Landsat tensor.")
+
+#         if np.isnan(et).any():
+#             print("DataLoader Warning: NaN values detected in ET tensor.")
+
+#         if np.isnan(climate).any():
+#             print("DataLoader Warning: NaN values detected in Climate tensor.")
+
+#         if np.isnan(soil).any():
+#             print("DataLoader Warning: NaN values detected in Soil tensor.")
+
+
+#         original_y = self.df.loc[idx]['yield']
+#         # original_y = torch.as_tensor(original_y, dtype=torch.float32)
+
+#         sample = {
+#             "year": year, 
+#             "county": county, 
+#             "crop_name": crop_name,
+#             "satellite": landsat,
+#             "et": et,
+#             "climate": climate,
+#             "soil": soil,
+#             "yield": original_y
+#         }
+
+
+#         return sample
+    
+#     def standardized(self, array):
+#         """
+#         Standardize and normalize Landsat time series imagery.
         
-        Args:
-            landsat_ts (numpy array): Landsat timeseries with shape (12, 6, N)
-                                    where 12 = months, 6 = bands, N = vectorized pixels.
+#         Args:
+#             landsat_ts (numpy array): Landsat timeseries with shape (12, 6, N)
+#                                     where 12 = months, 6 = bands, N = vectorized pixels.
         
-        Returns:
-            numpy array: Standardized and normalized Landsat imagery with shape (12, 6, N).
-        """
-        T, B, N = array.shape  
+#         Returns:
+#             numpy array: Standardized and normalized Landsat imagery with shape (12, 6, N).
+#         """
+#         T, B, N = array.shape  
 
-       
-        mean_per_band = np.mean(array, axis=(0, 2), keepdims=True)  
-        std_per_band = np.std(array, axis=(0, 2), keepdims=True) + 1e-10  
+#         array = np.nan_to_num(array, nan=0.0)
+#         mean_per_band = np.mean(array, axis=(0, 2), keepdims=True)  
+#         std_per_band = np.std(array, axis=(0, 2), keepdims=True) + 1e-10  
 
-        # Apply Z-score normalization
-        standardized = (array - mean_per_band) / std_per_band  
-
-
-        return standardized
+#         # Apply Z-score normalization
+#         standardized = (array - mean_per_band) / std_per_band  
+#         standardized = np.nan_to_num(standardized, nan=0.0)
+#         return standardized
         
-# def pad_tensor(data, max_size, fill_value=-9999):
-#     """
-#     Pads a tensor along the last dimension to match max_size.
-#     """
-#     current_size = data.shape[-1]
-#     if current_size < max_size:
-#         pad_size = max_size - current_size
-#         pad_shape = list(data.shape[:-1]) + [pad_size]
-#         padding = np.full(pad_shape, fill_value, dtype=data.dtype)
-#         return np.concatenate([data, padding], axis=-1)
-#     return data
-
-# def custom_collate(batch):
-#     """
-#     Custom collate function to pad all tensors to the max size in the batch.
-#     """
-#     # Find max size for padding
-#     N_max = max(sample["satellite"].shape[-1] for sample in batch)
-#     M_max = max(sample["climate"].shape[-1] for sample in batch)
-
-#     # Pad each tensor
-#     padded_batch = {
-#         "satellite": torch.tensor([pad_tensor(sample["satellite"], N_max) for sample in batch], dtype=torch.float32),
-#         "et": torch.tensor([pad_tensor(sample["et"], N_max) for sample in batch], dtype=torch.float32),
-#         "climate": torch.tensor([pad_tensor(sample["climate"], M_max) for sample in batch], dtype=torch.float32),
-#         "soil": torch.tensor([pad_tensor(sample["soil"], N_max) for sample in batch], dtype=torch.float32),
-#         "yield": torch.tensor([sample["yield"] for sample in batch], dtype=torch.float32)
-#     }
-#     return padded_batch
-
-
 def pad_tensor_fast(batch_tensors, max_size, fill_value=-9999):
     """
     Efficiently pads a batch of tensors to match the max_size along the last dimension.
@@ -212,6 +288,9 @@ def custom_collate(batch):
     climate_batch = [sample["climate"] for sample in batch]
     soil_batch = [sample["soil"] for sample in batch]
     yield_batch = torch.tensor([sample["yield"] for sample in batch], dtype=torch.float32)
+    year_batch = [sample["year"] for sample in batch]
+    county_batch = [sample["county"] for sample in batch]
+    crop_name_batch = [sample["crop_name"] for sample in batch]
 
     # Find max sizes
     N_max = max(s.shape[-1] for s in satellite_batch)
@@ -223,7 +302,10 @@ def custom_collate(batch):
         "et": pad_tensor_fast(et_batch, N_max),
         "climate": pad_tensor_fast(climate_batch, M_max),
         "soil": pad_tensor_fast(soil_batch, N_max),
-        "yield": yield_batch
+        "yield": yield_batch, 
+        "year": year_batch, 
+        "county": county_batch, 
+        "crop_name":crop_name_batch
     }
     return padded_batch
 

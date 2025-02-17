@@ -72,6 +72,7 @@ class YieldBenchmark(nn.Module):
         x = torch.cat((l_embed , et_embed, climate_embed, soil_embed), dim = 1)
         out = []
         x = self.encoder(x = x)
+        x = x.mean(dim = 1)
         out.append(x)
         return out
 
@@ -92,7 +93,7 @@ class YieldBenchmark(nn.Module):
             l_embed , et_embed, climate_embed, soil_embed = mmt_embed(landsat_t, et_t, climate_t, soil)
             x = torch.cat((l_embed , et_embed, climate_embed, soil_embed), dim = 1)
             x = self.encoder(x = x)
-
+            x = x.mean(dim = 1)
             out.append(x)
         
         return out
@@ -102,8 +103,9 @@ class YieldBenchmark(nn.Module):
                 et: torch.Tensor = None, 
                 climate: torch.Tensor = None, 
                 soil: torch.Tensor = None): 
-        
+
         if self.timeseries is True:
+            
             out = self.time_series(
                     landsat  = landsat, 
                     et = et, 

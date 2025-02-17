@@ -8,10 +8,55 @@ import yaml
 import matplotlib.pyplot as plt
 import torchvision
 
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, mean_absolute_percentage_error
+import numpy as np
 
-from src.configs import set_seed 
-set_seed(0)
+
+# from src.configs import set_seed 
+# set_seed(0)
 device = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+def plot_scatter_subplots(train_df, valid_df, test_df, month):
+    """
+    Creates scatter plots for train, valid, and test datasets in a single row with three columns.
+    
+    Args:
+        train_df (pd.DataFrame): Training dataset.
+        valid_df (pd.DataFrame): Validation dataset.
+        test_df (pd.DataFrame): Test dataset.
+        month (int): The month number corresponding to the ypred_m column (e.g., 12 for ypred_m12).
+    """
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+    datasets = {'Train': train_df, 'Valid': valid_df, 'Test': test_df}
+    
+    for ax, (name, df) in zip(axes, datasets.items()):
+        ypred_col = f"ypred_m{month}"
+        
+        # Compute evaluation metrics
+        r2 = r2_score(df["ytrue"], df[ypred_col])
+        rmse = np.sqrt(mean_squared_error(df["ytrue"], df[ypred_col]))
+        mae = mean_absolute_error(df["ytrue"], df[ypred_col])
+        
+        # Create scatter plot
+        sns.scatterplot(data=df, x="ytrue", y=ypred_col, hue="crop_name", palette="tab10", legend=False, s=50, marker='o', ax=ax)
+        
+        # Add text box with metrics
+        metrics_text = f"R²: {r2:.3f}\nRMSE: {rmse:.2f}\nMAE: {mae:.2f}"
+        ax.text(0.05, 0.95, metrics_text, transform=ax.transAxes, fontsize=12,
+                verticalalignment='top', bbox=dict(boxstyle="round,pad=0.3", edgecolor="black", facecolor="white"))
+        
+        # Labels and title
+        ax.set_xlabel("True Yield (ytrue)")
+        ax.set_ylabel(f"Predicted Yield ({ypred_col})")
+        ax.set_title(f"{name} Scatter Plot")
+        ax.grid(True)
+    
+    plt.tight_layout()
+    plt.show()
 
 
 

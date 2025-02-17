@@ -171,6 +171,7 @@ class Pretrain():
         return final_loss_value
 
 class FineTune():
+
     def __init__(self, 
                  exp_name: str, 
                  device: str,
@@ -179,17 +180,19 @@ class FineTune():
         self.device = device
 
         self.exp_output_dir = '/data2/hkaman/Projects/Foundational/EXPs/' + 'EXP_' + exp_name
-
+        os.makedirs(self.exp_output_dir, exist_ok=True)
         self.best_model_name = os.path.join(self.exp_output_dir, 'best_model_' + exp_name + '.pth')
         # self.best_checkpoint_dir = os.path.join(self.exp_output_dir, 'best_checkpoints_' + self.exp + '.pth')
         # self.checkpoint_dir = os.path.join(self.exp_output_dir, 'checkpoints')
-        self.loss_fig_name = os.path.join(self.exp_output_dir, 'loss', 'loss_' + exp_name + '.png')
-        self.loss_df_name = os.path.join(self.exp_output_dir, 'loss', 'loss_' + exp_name + '.csv')
+        self.loss_dir = os.path.join(self.exp_output_dir, 'loss')
+        os.makedirs(self.loss_dir, exist_ok=True)
+
+        self.loss_fig_name = os.path.join(self.loss_dir, 'loss_' + exp_name + '.png')
+        self.loss_df_name = os.path.join(self.loss_dir, 'loss_' + exp_name + '.csv')
+
         self.train_df_name = os.path.join(self.exp_output_dir, exp_name + '_train.csv')
         self.valid_df_name = os.path.join(self.exp_output_dir, exp_name + '_valid.csv')
         self.test_df_name = os.path.join(self.exp_output_dir, exp_name + '_test.csv')
-
-
 
     def fit(self, config: Union[Dict]):
         
@@ -202,7 +205,6 @@ class FineTune():
 
         return model
     
-
     def train(self, 
               model: torch.nn.Module,  
               dataloader_train: Iterable,   
@@ -236,12 +238,12 @@ class FineTune():
             model.train()
 
             for batch, sample in enumerate(dataloader_train):
-                                
+                
                 list_ytrain_pred = model(                    
-                    landsat = sample['satellite'].to(device), 
-                    et = sample['et'].to(device), 
-                    climate = sample['climate'].to(device), 
-                    soil = sample['soil'].to(device)) 
+                    landsat = sample['landsat_linear'].to(device), 
+                    et = sample['et_linear'].to(device), 
+                    climate = sample['climate_linear'].to(device), 
+                    soil = sample['soil_linear'].to(device)) 
                 
                 optimizer.zero_grad()
                 ytrain_true = sample['yield'].to(device)
@@ -253,16 +255,16 @@ class FineTune():
                 train_epoch_loss += train_loss.item() 
 
             # VALIDATION    
-            self.model.eval()  # Set the model to evaluation mode
+            model.eval()  # Set the model to evaluation mode
             with torch.no_grad():
                 val_epoch_loss = 0
                 for batch, sample in enumerate(dataloader_valid):
                 
                     list_yvalid_pred = model(                    
-                        landsat = sample['satellite'].to(device), 
-                        et = sample['et'].to(device), 
-                        climate = sample['climate'].to(device), 
-                        soil = sample['soil'].to(device))   
+                        landsat = sample['landsat_linear'].to(device), 
+                        et = sample['et_linear'].to(device), 
+                        climate = sample['climate_linear'].to(device), 
+                        soil = sample['soil_linear'].to(device))   
                     
                     yvalid_true = sample['yield'].to(device)
                     valid_loss = self._calculate_timeseries_loss(yvalid_true, list_yvalid_pred, loss)
@@ -278,7 +280,7 @@ class FineTune():
             if (val_epoch_loss/len(dataloader_valid)) < best_val_loss or epoch==0:
                         
                 best_val_loss=(val_epoch_loss/len(dataloader_valid))
-                torch.save(self.model.state_dict(), self.best_model_name)
+                torch.save(model.state_dict(), self.best_model_name)
                 print(f'=============================== Best model Saved! Val MSE: {best_val_loss:.4f}')
                 status = True
             else:
@@ -287,7 +289,6 @@ class FineTune():
             early_stopping(status)
             if early_stopping.early_stop:
                 print("Early stopping triggered at epoch:", epoch)
-                torch.save(self.model.state_dict(), self.last_model_name)
                 break
 
         self._save_loss_df(loss_stats, self.loss_df_name, self.loss_fig_name)
@@ -301,10 +302,10 @@ class FineTune():
             for batch, sample in enumerate(data_loader):
 
                 ypred_list = model(
-                        landsat = sample['satellite'].to(device), 
-                        et = sample['et'].to(device), 
-                        climate = sample['climate'].to(device), 
-                        soil = sample['soil'].to(device)
+                        landsat = sample['landsat_linear'].to(device), 
+                        et = sample['et_linear'].to(device), 
+                        climate = sample['climate_linear'].to(device), 
+                        soil = sample['soil_linear'].to(device)
                 ) 
 
                 years = sample['year']
@@ -323,6 +324,8 @@ class FineTune():
                         key = "ypred_m12"  
                     else:
                         key = f"ypred_m{i+1}"  
+
+
                     this_batch[key] = pred.detach().cpu().numpy()
 
                 output_files.append(this_batch)
@@ -347,12 +350,7 @@ class FineTune():
     
     def _return_modified_pred_df(self, pred_npy, blocks_list, wsize=None):
 
-        if blocks_list is None: 
-            all_block_names = [dict['block'] for dict in pred_npy]#[0]
-            blocks_list = list(set(item for sublist in all_block_names for item in sublist))
 
-
-        OutDF = pd.DataFrame()
         columns = ['year', 'county', 'crop_name', 'ytrue']
         data = {col: [] for col in columns}  # Initialize dictionary for DataFrame
         pred_keys = [key for key in pred_npy[0].keys() if key.startswith('ypred')]
@@ -371,7 +369,7 @@ class FineTune():
             data['ytrue'].append(ytrue)
 
             for key in pred_keys:
-                flattened_pred = pred_npy[l][key]
+                flattened_pred = pred_npy[l][key].flatten()
                 data[key].append(flattened_pred)
 
         empty_dict = {key: None for key in data.keys()}
@@ -379,12 +377,12 @@ class FineTune():
         for key in data:
             if data[key]:  
                 output = np.concatenate(data[key])
+                
                 empty_dict[key] = output
 
         results = pd.DataFrame(empty_dict)
         return results
     
-
     def _save_loss_df(self, loss_stat, loss_df_name, loss_fig_name):
 
         df = pd.DataFrame.from_dict(loss_stat).reset_index().melt(id_vars=['index']).rename(columns={"index":"epochs"})
