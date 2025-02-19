@@ -730,7 +730,7 @@ class DownloadOpenETEE:
         self.dataframe = gpd.read_file('/data2/hkaman/Data/CDL/California_Counties.geojson')
         self.dataframe = self.dataframe.to_crs(epsg=4326)
 
-    def download(self):
+    def __call__(self):
         """
         Downloads OpenET data for each month in the specified year for the given geometry.
         """
