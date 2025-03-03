@@ -478,7 +478,6 @@ CROP_NAME_MANUAL_MATCHES = {
         }
 
 
-
 class DownloadCDLEE():
     def __init__(self, 
                  year: int, 
@@ -619,13 +618,12 @@ class DownloadOpenETEE:
         """
         geometry, _, ee_geometry, county_name_modified = get_county_info(self.dataframe, self.county_name)
 
-
         for i in range(12):
             start_date, end_date = get_monthly_dates(self.year, i)
             print(start_date, end_date)
             image = self.get_openet_image(geometry, ee_geometry, start_date, end_date)
             if image is not None:
-                self.export_image(image, county_name_modified, ee_geometry, index=i)
+                self.export_image_to_local(image, county_name_modified, ee_geometry, index=i)
 
 
     def get_openet_image(self, geometry, ee_geometry, start_date, end_date):
@@ -672,6 +670,49 @@ class DownloadOpenETEE:
         )
         task.start()
         print(f"Export task {file_name} started.")
+
+    def export_image_to_local(self, image, county_name, ee_geometry, index=None):
+
+        image = image.toFloat()
+        file_path = '/data2/hkaman/Data/FoundationModel/ETS/'
+
+        try:
+            image_id = image.get('system:id').getInfo()
+            file_name_part = image_id.split('/')[-1]
+        except Exception:
+            file_name_part = f"image_{index}"
+
+        file_name = f"{county_name}_{file_name_part}.tif"
+        full_path = f"{file_path}{file_name}"
+
+        print(f"Downloading {file_name} to {full_path}...")
+
+        ## Estimate Image Size in MB
+        # num_pixels = image.clip(ee_geometry).reduceRegion(
+        #     reducer=ee.Reducer.count(),
+        #     geometry=ee_geometry,
+        #     scale=30,  # Use the same scale as export
+        #     maxPixels=1e13
+        # ).values().get(0)
+
+        # num_bands = image.bandNames().size()
+        # bit_depth = 16  # Landsat images are usually 16-bit
+
+        # # Compute file size in MB
+        # size_mb = ee.Number(num_pixels).multiply(num_bands).multiply(bit_depth).divide(8 * 1024**2).getInfo()
+
+        # print(f"Estimated image size: {size_mb:.2f} MB")
+
+
+        geemap.ee_export_image(
+            image.clip(ee_geometry), 
+            filename=full_path, 
+            scale=30, 
+            region=ee_geometry, 
+            file_per_band=False,
+        )
+
+        print(f"Image saved to {full_path}")
 
 class SSURGODownloader:
     def __init__(self, county_name: str, year: int):
@@ -744,17 +785,18 @@ class SSURGODownloader:
 class DownloadSatelliteImgEE:
     def __init__(self, 
                  year: int, 
+                 county_name:str,
                  start_date: str, 
                  end_date: str,
                  cloud_filter: float, 
                  satellite: str):
         self.year = year
+        self.county_name = county_name
         self.start_date = start_date
         self.end_date = end_date
         self.cloud_filter = cloud_filter
         self.satellite = satellite
 
-        # Load California counties
         self.dataframe = geopandas.read_file(CA_COUNTIES_SHAPEFILE_DIR)
         self.dataframe = self.dataframe.to_crs(epsg = DEFAULT_CRS)
 
@@ -762,126 +804,35 @@ class DownloadSatelliteImgEE:
         self.get_satellite_data_for_county()
 
     def get_satellite_data_for_county(self):
-        polygon = self.dataframe.iloc[19].geometry
-        aoi_geojson = geojson.Feature(geometry=mapping(polygon))
-        geometry = aoi_geojson["geometry"]
 
-        try:
-            ee_geometry = self.get_flexible_geometry(geometry)
-        except ValueError as e:
-            print(f"Error processing geometry: {e}")
-            return
+        geometry, _, ee_geometry, county_name_modified = get_county_info(self.dataframe, self.county_name)
 
-        county_name = self.dataframe.iloc[19].NAME
-        county_name_modified = self.county_name_modification(county_name)
-
-        # for i in range(12):
-        # start_date, end_date = self.get_monthly_dates(i)
-        # print(start_date, end_date)
         images = self.get_landsat_images_by_month(geometry, ee_geometry, self.start_date, self.end_date)
-        for image in images:
-            if image is not None:
-                self.export_image(image, county_name_modified, ee_geometry, index=0)
+
+        # for image in images:
+        if images is not None:
+            self.export_image(images, county_name_modified, ee_geometry, index=0)
 
 
-    def get_flexible_geometry(self, geometry):
-        """
-        Convert a GeoPandas geometry to an Earth Engine-compatible geometry.
-
-        Args:
-            geometry (shapely.geometry): The inumpyut geometry (Polygon, MultiPolygon, etc.).
-
-        Returns:
-            ee.Geometry: A valid Earth Engine geometry.
-        """
-        # Handle MultiPolygon or Polygon for Earth Engine
-        if geometry["type"] == "Polygon":
-            eeg = ee.Geometry.Polygon(geometry["coordinates"])
-        elif geometry["type"] == "MultiPolygon":
-            # Flatten MultiPolygon to list of Polygons for Earth Engine
-            polygons = [coords for coords in geometry["coordinates"]]
-            eeg = ee.Geometry.MultiPolygon(polygons)
-        else:
-            raise ValueError(f"Unsupported geometry type: {geometry['type']}")
-        return eeg
-   
-    def county_name_modification(self, county_name: str) -> str:
-        if county_name.endswith(" County"):
-            county_name = county_name[:-7]
-        county_name = county_name.replace(" ", "")
-        return county_name
-    
-    def get_year_dates(self):
-        start_date = f'{self.year}-01-01'
-        end_date = f'{self.year}-12-31'  
-        return start_date, end_date
-    
-    def get_monthly_dates(self, index):
-        """
-        Returns the start and end dates for a specific month in the given year.
-
-        Args:
-            index (int): The month index (0 for January, 1 for February, ..., 11 for December).
-
-        Returns:
-            tuple: A tuple containing the start_date and end_date in 'YYYY-MM-DD' format.
-        """
-        if index < 0 or index > 11:
-            raise ValueError("Index must be between 0 (January) and 11 (December).")
-        
-        # Convert index to 1-based month (e.g., 0 -> 1, 1 -> 2, ...)
-        month = index + 1
-
-        # Get the last day of the month
-        last_day = calendar.monthrange(self.year, month)[1]
-
-        # Format the start and end dates
-        start_date = f'{self.year}-{month:02d}-01'
-        end_date = f'{self.year}-{month:02d}-{last_day}'
-
-        return start_date, end_date
     
     def get_image_size(self, image):
-        """
-        Calculate the approximate size of an Earth Engine image in megabytes (MB).
 
-        Args:
-            image (ee.Image): The Earth Engine image.
-
-        Returns:
-            ee.Number: The size of the image in MB.
-        """
-        # Get the number of pixels in the image
         num_pixels = image.reduceRegion(
             reducer=ee.Reducer.count(),
             geometry=image.geometry(),
-            scale=30,  # Landsat resolution
+            scale=30,  
             maxPixels=1e13
-        ).values().get(0)  # First (and only) value
+        ).values().get(0) 
 
-        # Get the number of bands in the image
         num_bands = image.bandNames().size()
-
-        # Assume 16-bit for Landsat bands
         bit_depth = 16
-
-        # Calculate size in MB
         size_mb = ee.Number(num_pixels).multiply(num_bands).multiply(bit_depth).divide(8 * 1024**2)
-
         return size_mb
 
     def has_missing_values(self, image):
-        """
-        Check if an image has missing (masked) values.
 
-        Args:
-            image (ee.Image): The Earth Engine image.
-
-        Returns:
-            bool: True if the image has missing values, otherwise False.
-        """
         mask = image.mask()
-        missing = mask.Not()  # Invert the mask to find missing pixels
+        missing = mask.Not() 
         missing_count = missing.reduceRegion(
             reducer=ee.Reducer.sum(),
             geometry=image.geometry(),
@@ -892,99 +843,54 @@ class DownloadSatelliteImgEE:
         return any(value > 0 for value in missing_count.values())
     
     def fill_large_gaps_with_mosaic(self, collection, geometry):
-        """
-        Fills large gaps in Landsat images by combining multiple images in a collection.
 
-        Args:
-            collection (ee.ImageCollection): The Landsat image collection.
-            geometry (ee.Geometry): The region of interest.
-
-        Returns:
-            ee.Image: A single image with reduced gaps.
-        """
-        # Mosaic multiple images to fill gaps
         combined_image = collection.mosaic().clip(geometry)
         return combined_image
     
     def fill_with_focal_mean(self, image):
-        """
-        Fills smaller gaps in an image using neighboring pixels.
 
-        Args:
-            image (ee.Image): The Landsat image.
-
-        Returns:
-            ee.Image: The image with filled gaps.
-        """
         return image.unmask(None).focal_mean(radius=9, units='pixels', kernelType='square')
 
     def get_landsat_images_by_month(self, geometry, ee_geometry, start_date, end_date):
-        """
-        Fetches a Landsat image for one month, filtered by geometry, cloud cover, and size.
-        Ensures the image with the lowest cloud cover and size ≥ 100 MB is selected.
 
-        Args:
-            geometry (ee.Geometry): The region of interest.
-
-        Returns:
-            ee.Image: The selected Landsat image or None if no suitable image is found.
-        """
-        # Define Landsat collections
         landsat5 = ee.ImageCollection('LANDSAT/LT05/C02/T1_L2').select(['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B7'])
         landsat7 = ee.ImageCollection('LANDSAT/LE07/C02/T1_L2').select(['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B7'])
         landsat8 = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2').select(['SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7'])
 
-        # Merge collections and filter by geometry and date
+
         landsat = (landsat5.merge(landsat7).merge(landsat8)
                 .filterBounds(geometry)
                 .filterDate(start_date, end_date)
-                # .filter(ee.Filter.lt('CLOUD_COVER', 5))
                 )
-        # # Combine multiple images using mosaic to fill large gaps
-        # landsat = self.fill_large_gaps_with_mosaic(landsat, geometry)
-        # # Fill remaining small gaps using focal_mean
-        # landsat = self.fill_with_focal_mean(landsat)
+        print(f"Before cloud masking {landsat.size().getInfo()} were found!")
         image_list = landsat.toList(landsat.size())
-        # image = ee.Image(image_list.get(0))
-
-
         sorted_landsat = landsat.sort('CLOUD_COVER')
-        # # best_image = None
-        # image_list = sorted_landsat.toList(sorted_landsat.size())
+        best_image = None
+        image_list = sorted_landsat.toList(sorted_landsat.size())
 
         list_images = []
-        # num_images = sorted_landsat.size().getInfo()
-        # print(f"Number of images: {num_images}")
+
         for i in range(sorted_landsat.size().getInfo()):
             image = ee.Image(image_list.get(i))
-        #     size_mb = self.get_image_size(image).getInfo()
+            size_mb = self.get_image_size(image).getInfo()
             image = self.crop_image_to_geometry(image, ee_geometry)
             list_images.append(image)
-        #     if size_mb >= 100:
-        #         best_image = image
-        #         # best_image = self.fill_missing_values(best_image)
-        #         print(f"Selected image with cloud cover: {best_image.get('CLOUD_COVER').getInfo()} and size: {size_mb:.2f} MB")
-        #         break
-        #     else:
-        #         print(f"Image skipped due to size: {size_mb:.2f} MB")
+            if size_mb >= 100:
+                best_image = image
+                # best_image = self.fill_missing_values(best_image)
+                print(f"Selected image with cloud cover: {best_image.get('CLOUD_COVER').getInfo()} and size: {size_mb:.2f} MB")
+                break
+            else:
+                print(f"Image skipped due to size: {size_mb:.2f} MB")
 
-        # if best_image is None:
-        #     print("No suitable Landsat image found for the specified month.")
+        if best_image is None:
+            print("No suitable Landsat image found for the specified month.")
 
-        # print(f"Selected image ID: {best_image.get('system:id').getInfo()} with cloud cover: {best_image.get('CLOUD_COVER').getInfo()}")
-        return list_images
+        print(f"Selected image ID: {best_image.get('system:id').getInfo()} with cloud cover: {best_image.get('CLOUD_COVER').getInfo()}")
+        return best_image
 
     def crop_image_to_geometry(self, image, geometry):
-        """
-        Crop the given image to the specified geometry.
 
-        Args:
-            image (ee.Image): The Earth Engine Image object.
-            geometry (ee.Geometry): The geometry to crop the image to.
-        
-        Returns:
-            ee.Image: Cropped Earth Engine Image.
-        """
         return image.clip(geometry)
 
     def export_image(self, image, county_name, ee_geometry, index=None):
@@ -994,7 +900,7 @@ class DownloadSatelliteImgEE:
             image_id = image.get('system:id').getInfo()
             file_name_part = image_id.split('/')[-1]
         except Exception:
-            file_name_part = f"image_{index}"  # Fallback identifier if system:id is missing
+            file_name_part = f"image_{index}"  
 
         file_name = f"{county_name}_{file_name_part}"  
         year_folder = str(self.year)
@@ -1012,8 +918,32 @@ class DownloadSatelliteImgEE:
         print(f"Export task {file_name} started.")
         return task
     
+    def export_image_to_local(self, image, county_name, ee_geometry, index=None):
 
-    
+        image = image.toFloat()
+        file_path = '/data2/hkaman/Data/FoundationModel/Landsat/'
+
+        try:
+            image_id = image.get('system:id').getInfo()
+            file_name_part = image_id.split('/')[-1]
+        except Exception:
+            file_name_part = f"image_{index}"
+
+        file_name = f"{county_name}_{file_name_part}.tif"
+        full_path = f"{file_path}{file_name}"
+
+        print(f"Downloading {file_name} to {full_path}...")
+
+        geemap.ee_export_image(
+            image, 
+            filename=full_path, 
+            scale=30, 
+            region=ee_geometry, 
+            file_per_band=False
+        )
+
+        print(f"Image saved to {full_path}")
+
 class ProcessingYieldObs():
     def __init__(self, county_name: str, output_root_dir:str):
 
@@ -1971,7 +1901,6 @@ class CountyDataCreator:
 
         # Threshold: Any value > 0 means at least one contributing pixel was 1
         return (resampled_area > 0).astype(numpy.uint8)
-
 
 
 def get_county_info(dataframe, county_name):
