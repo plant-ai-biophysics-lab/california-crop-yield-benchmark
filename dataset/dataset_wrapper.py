@@ -623,7 +623,7 @@ class DownloadOpenETEE:
             print(start_date, end_date)
             image = self.get_openet_image(geometry, ee_geometry, start_date, end_date)
             if image is not None:
-                self.export_image_to_local(image, county_name_modified, ee_geometry, index=i)
+                self.export_image(image, county_name_modified, ee_geometry, index=i)
 
 
     def get_openet_image(self, geometry, ee_geometry, start_date, end_date):
@@ -1118,34 +1118,28 @@ class ModelProcessedData:
         self.output_dir = os.path.join(root_dir,county_name, f"InD/{self.year[0]}/{county_name}_{self.year[0]}.numpyz")
 
         # Paths for each year
-        self.cdl_paths = [os.path.join(root_dir, county_name, f"CDL/{yr}/{county_name}_{yr}.tif") for yr in self.year]
-        self.landsat_dirs = [os.path.join(root_dir, county_name, f"Landsat/{yr}/") for yr in self.year]
+        self.cdl_paths = [os.path.join(root_dir, county_name, f"Raw/CDL/{yr}/{county_name}_{yr}.tif") for yr in self.year]
+        self.landsat_dirs = [os.path.join(root_dir, county_name, f"Raw/Landsat/{yr}/") for yr in self.year]
         self.landsat_files = {
             yr: sorted([os.path.join(dir, f) for f in os.listdir(dir) if f.endswith(".tif")])
             for yr, dir in zip(self.year, self.landsat_dirs)
         }
-        self.et_dirs = [os.path.join(root_dir, county_name, f"ET/{yr}/") for yr in self.year]
+        self.et_dirs = [os.path.join(root_dir, county_name, f"Raw/ET/{yr}/") for yr in self.year]
         self.et_files = {
             yr: sorted([os.path.join(dir, f) for f in os.listdir(dir) if f.endswith(".tif")])
             for yr, dir in zip(self.year, self.et_dirs)
         }
-        self.climate_paths = [os.path.join(root_dir, county_name, f"Climate/{yr}/DayMet_{county_name}_{yr}.nc") for yr in self.year]
-        self.soil_dir = os.path.join(root_dir, county_name, "Soil/spatial/soilmu_a_ca053.shp")
+        self.climate_paths = [os.path.join(root_dir, county_name, f"Raw/Climate/{yr}/DayMet_{county_name}_{yr}.nc") for yr in self.year]
+        import glob
+        self.soil_dir = glob.glob(os.path.join(root_dir, county_name, "Raw/Soil/spatial/soilmu_a_*.shp"))
+
+        if self.soil_dir:
+            self.soil_dir = self.soil_dir[0]  # Take the first matching file
+        else:
+            print("No shapefile found.")
     
     def __call__(self, output_type: str | List[str] = "all", daily_climate: bool = True):
-        """
-        Args:
-            output_type (str or list[str]): Specify the desired output(s).
-                - "all" for all outputs (default)
-                - Any combination of: "landsat_data", "et_data", "climate_data", "soil_data"
-            daily_climate (bool): Whether to use daily climate data.
 
-        Returns:
-            dict: A dictionary where each crop name maps to another dictionary containing requested datasets.
-        """
-
-
-        # Ensure output_type is a list for consistent processing
         if output_type == "all":
             requested_outputs = ["landsat_data", "et_data", "climate_data", "soil_data"]
         elif isinstance(output_type, str):
@@ -1155,18 +1149,16 @@ class ModelProcessedData:
         else:
             raise ValueError("Invalid output_type. Must be 'all', a string, or a list of strings.")
 
-        # Validate requested outputs
+
         valid_outputs = {"landsat_data", "et_data", "climate_data", "soil_data"}
         invalid_outputs = [key for key in requested_outputs if key not in valid_outputs]
         if invalid_outputs:
             raise ValueError(f"Invalid output(s) requested: {invalid_outputs}. Valid options are {valid_outputs}.")
 
-        # Initialize the output dictionary for multiple crops
+
         outputs = {}
 
-        # Process each crop separately
         for crop_name in self.crop_names:
-            # Get cultivated area for the current crop
             cdl_cultivated_data = self.get_cultivated_area(crop_name = crop_name)
             if cdl_cultivated_data is not None:
 
@@ -1184,7 +1176,7 @@ class ModelProcessedData:
                     crop_outputs["soil_data"] = self.get_soil_dataset(cdl_cultivated_data)
                 outputs[crop_name] = crop_outputs
             
-        numpy.savez_compressed(self.output_dir , inumpyut = outputs)
+        # numpy.savez_compressed(self.output_dir , inumpyut = outputs)
 
         return outputs
 
@@ -1323,7 +1315,7 @@ class ModelProcessedData:
                 timeseries.append(masked_landsat)  # Append (B, N) for each timestamp
 
         # Stack along the time dimension
-        return numpy.stack(timeseries, axis=0) 
+        return stratified_sampling(numpy.stack(timeseries, axis=0) , num_samples=128)  
 
     def get_masked_et_timeseries(self, cultivated_area):
         """
@@ -1352,7 +1344,7 @@ class ModelProcessedData:
                 timeseries.append(masked_et)
 
 
-        return numpy.stack(timeseries, axis=0) 
+        return stratified_sampling(numpy.stack(timeseries, axis=0) , num_samples=128) 
     
     def get_soil_dataset(self, cultivated_area):
         """
@@ -1463,7 +1455,7 @@ class ModelProcessedData:
             soil_maps[i, :] = attr_map[mask]
             soil_maps[i, numpy.isnan(soil_maps[i, :])] = 0.0
 
-        return soil_maps  # Shape: (B, N)
+        return stratified_sampling(soil_maps, num_samples=128)  
 
     def get_climate_stack(self, cultivated_area, daily: bool = True):
         """
@@ -1513,7 +1505,7 @@ class ModelProcessedData:
                 masked_climate_stack = climate_stack[:, mask]  # Output shape: (B, N) where N = non-zero pixels
                 timeseries.append(masked_climate_stack)
 
-        return numpy.stack(timeseries, axis=0) 
+        return stratified_sampling(numpy.stack(timeseries, axis=0) , num_samples=128) 
 
     def resample_cultivated_area(self, cultivated_area, target_shape):
         """
@@ -1546,6 +1538,8 @@ class ModelProcessedData:
         # Threshold: Any value > 0 means at least one contributing pixel was 1
         return (resampled_area > 0).astype(numpy.uint8)
 
+
+
 class CountyDataCreator:
     def __init__(self, county_name: str = 'Monterey', year: Union[List[int], int] = 2008, crop_names: Union[str, List[str], None] = None):
         """
@@ -1567,19 +1561,26 @@ class CountyDataCreator:
         root_dir = '/data2/hkaman/Data/FoundationModel'
 
         # Paths for each year
-        self.cdl_paths = [os.path.join(root_dir, county_name, f"CDL/{yr}/{county_name}_{yr}.tif") for yr in self.year]
-        self.landsat_dirs = [os.path.join(root_dir, county_name, f"Landsat/{yr}/") for yr in self.year]
+        self.cdl_paths = [os.path.join(root_dir, county_name, f"Raw/CDL/{yr}/{county_name}_{yr}.tif") for yr in self.year]
+        self.landsat_dirs = [os.path.join(root_dir, county_name, f"Raw/Landsat/{yr}/") for yr in self.year]
         self.landsat_files = {
             yr: sorted([os.path.join(dir, f) for f in os.listdir(dir) if f.endswith(".tif")])
             for yr, dir in zip(self.year, self.landsat_dirs)
         }
-        self.et_dirs = [os.path.join(root_dir, county_name, f"ET/{yr}/") for yr in self.year]
+        self.et_dirs = [os.path.join(root_dir, county_name, f"Raw/ET/{yr}/") for yr in self.year]
         self.et_files = {
             yr: sorted([os.path.join(dir, f) for f in os.listdir(dir) if f.endswith(".tif")])
             for yr, dir in zip(self.year, self.et_dirs)
         }
-        self.climate_paths = [os.path.join(root_dir, county_name, f"Climate/{yr}/DayMet_{county_name}_{yr}.nc") for yr in self.year]
-        self.soil_dir = os.path.join(root_dir, county_name, "Soil/spatial/soilmu_a_ca053.shp")
+        self.climate_paths = [os.path.join(root_dir, county_name, f"Raw/Climate/{yr}/DayMet_{county_name}_{yr}.nc") for yr in self.year]
+        # self.soil_dir = os.path.join(root_dir, county_name, "Raw/Soil/spatial/soilmu_a_*.shp")
+        import glob
+        self.soil_dir = glob.glob(os.path.join(root_dir, county_name, "Raw/Soil/spatial/soilmu_a_*.shp"))
+
+        if self.soil_dir:
+            self.soil_dir = self.soil_dir[0]  # Take the first matching file
+        else:
+            print("No shapefile found.")
 
     def __call__(self, output_type: str | List[str] = "all", daily_climate: bool = True):
         """
@@ -1710,13 +1711,13 @@ class CountyDataCreator:
             if crop_names:
                 if not isinstance(crop_names, list):
                     crop_names = [crop_names]
-                crop_codes = [code for code, name in cdl_crop_legend.items() if name in crop_names]
+                crop_codes = [code for code, name in CDL_CROP_LEGEND.items() if name in crop_names]
                 if not crop_codes:
                     raise ValueError("None of the specified crop names are valid.")
             else:
                 crop_codes = [
-                    code for code in cdl_crop_legend
-                    if cdl_crop_legend[code] not in ["Non-agricultural", "NLCD-sampled categories", "Other"]
+                    code for code in CDL_CROP_LEGEND
+                    if CDL_CROP_LEGEND[code] not in ["Non-agricultural", "NLCD-sampled categories", "Other"]
                 ]
 
             mask = numpy.isin(cdl_data, crop_codes)
@@ -1836,7 +1837,7 @@ class CountyDataCreator:
         bounds, crs, resolution = self.get_reference_grid()
 
         for climate_path in self.climate_paths:
-            climate_data = xr.open_dataset(climate_path)[variables]
+            climate_data = xarray.open_dataset(climate_path)[variables]
             daymet_crs = "+proj=lcc +lat_1=25 +lat_2=60 +lat_0=42.5 +lon_0=-100 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
             climate_data = climate_data.rio.write_crs(daymet_crs)
 
@@ -1902,6 +1903,25 @@ class CountyDataCreator:
         # Threshold: Any value > 0 means at least one contributing pixel was 1
         return (resampled_area > 0).astype(numpy.uint8)
 
+def stratified_sampling(array, num_samples=128):
+    """
+    Apply stratified sampling along the last dimension of an array with shape (..., N).
+    
+    Parameters:
+    - array (np.ndarray): Input array of shape (..., N)
+    - num_samples (int): Number of samples to return along the last dimension
+    
+    Returns:
+    - np.ndarray: Sampled array with shape (..., num_samples)
+    """
+    percentiles = numpy.linspace(0, 100, num_samples)
+
+    if array.ndim == 2:
+        return numpy.percentile(array, percentiles, axis=-1).swapaxes(-1, -2)
+    if array.ndim == 3:
+        T, B, N = array.shape
+        return numpy.percentile(array, percentiles, axis=-1).transpose(1, 2, 0)  # Ensure (T, B, 128)
+    
 
 def get_county_info(dataframe, county_name):
     """
@@ -2462,11 +2482,15 @@ def plot_datasets(landsat_data, et_data, climate_data, soil_data):
         Normalize array using 5th and 95th percentiles for visualization.
         NaN values are replaced with 0.
         """
+        min = numpy.nanmin(array)
+        max = numpy.nanmax(array)
+        print(f"before: {min}, {max}")
         array = numpy.nan_to_num(array, nan=0)  # Replace NaN with 0
         # p5, p95 = numpy.percentile(array, [5, 95])  # Compute 5th and 95th percentiles
         # print(p5, p95)
         min = numpy.nanmin(array)
         max = numpy.nanmax(array)
+        print(min, max)
         # array = numpy.clip(array, p5, p95)  # Clip values to the percentile range
         normalized = (array - min) / (max - min + 1e-10)  # Normalize to [0, 1]
         return numpy.clip(normalized * brightness, 0, 1) 
