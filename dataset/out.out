@@ -1,0 +1,4 @@
+nohup: ignoring input
+['Grapes', 'Other Hay/Non Alfalfa', 'Olives']
+/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/rasterio/warp.py:344: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.
+  _reproject(

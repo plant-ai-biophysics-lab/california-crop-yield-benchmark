@@ -14,48 +14,120 @@ from typing import List, Union
 from skimage.transform import resize
 import torch
 from torch.utils.data import Dataset
+
+from dataset import dataset_wrapper as util
 # from src.configs import set_seed
 # set_seed(1987)
 
 
-def read_and_split_csf_files(base_path):
+# def read_and_split_csf_files(base_path):
 
+#     train_years = list(range(2008, 2012)) + list(range(2013, 2019))  # Excludes 2012
+#     valid_years = [2019, 2020]
+#     test_years = [2021, 2022]
+
+#     train_df, valid_df, test_df = [], [], []
+
+#     for year in range(2008, 2023):  # Loop through all expected years
+#         folder_path = os.path.join(base_path, str(year))
+#         csv_file = os.path.join(folder_path, f"yield_{year}.csv")  # Assuming filename matches the year
+
+#         if year == 2012 or not os.path.exists(csv_file):
+#             continue  # Skip missing years or non-existing files
+
+#         df = pd.read_csv(csv_file)  # Update if a different format is needed
+#         df = df[df['key_crop_name'] != 'No Match']
+
+#         if year in train_years:
+#             train_df.append(df)
+#         elif year in valid_years:
+#             valid_df.append(df)
+#         elif year in test_years:
+#             test_df.append(df)
+
+#     # Concatenate dataframes
+#     train_df = pd.concat(train_df, ignore_index=True) if train_df else None
+#     valid_df = pd.concat(valid_df, ignore_index=True) if valid_df else None
+#     test_df = pd.concat(test_df, ignore_index=True) if test_df else None
+
+#     return train_df, valid_df, test_df
+
+def compute_weights_for_yield_bins(df, yield_column="yield", bin_interval=20):
+    """
+    Compute sample weights for each yield bin for PyTorch's WeightedRandomSampler.
+
+    Parameters:
+    - df (pd.DataFrame): DataFrame containing a column with yield values.
+    - yield_column (str): Name of the yield column.
+    - bin_interval (int): The interval for binning yield values.
+
+    Returns:
+    - torch.Tensor: A tensor of weights for each sample in df.
+    """
+    # Define bins (0 to 200 with steps of 20)
+    bins = np.arange(0, 220, bin_interval)  # 220 ensures inclusion of 200
+    bin_labels = np.arange(len(bins) - 1)  # Assign bin indices (0, 1, 2, ...)
+
+    # Assign bin labels to each yield value
+    df["yield_bin"] = pd.cut(df[yield_column], bins=bins, labels=bin_labels, include_lowest=True)
+
+    # Count the number of occurrences in each bin
+    bin_counts = df["yield_bin"].value_counts().sort_index()
+
+    # Compute inverse frequency (higher weight for less frequent bins)
+    bin_weights = 1.0 / (bin_counts + 1e-6)  # Avoid division by zero
+
+    # Normalize weights so they sum to 1
+    bin_weights /= bin_weights.sum()
+
+    # Assign weight to each sample based on its bin
+    sample_weights = df["yield_bin"].map(bin_weights)
+
+    # Convert to PyTorch tensor
+    return sample_weights #torch.tensor(sample_weights.values, dtype=torch.float32)
+
+
+def read_and_split_csf_files(base_path, county_names):
+    """Reads and splits CSV files for multiple counties."""
+    
     train_years = list(range(2008, 2012)) + list(range(2013, 2019))  # Excludes 2012
     valid_years = [2019, 2020]
     test_years = [2021, 2022]
 
     train_df, valid_df, test_df = [], [], []
 
-    for year in range(2008, 2023):  # Loop through all expected years
-        folder_path = os.path.join(base_path, str(year))
-        csv_file = os.path.join(folder_path, f"yield_{year}.csv")  # Assuming filename matches the year
+    for county in county_names:
+        for year in range(2008, 2023):  # Loop through all expected years
+            folder_path = os.path.join(base_path, county, "InD", str(year))
+            csv_file = os.path.join(folder_path, f"yield_{year}.csv")  # Assuming filename matches the year
 
-        if year == 2012 or not os.path.exists(csv_file):
-            continue  # Skip missing years or non-existing files
+            if year == 2012 or not os.path.exists(csv_file):
+                continue  # Skip missing years or non-existing files
 
-        df = pd.read_csv(csv_file)  # Update if a different format is needed
-        df = df[df['key_crop_name'] != 'No Match']
+            df = pd.read_csv(csv_file)  # Update if a different format is needed
+            df = df[df['key_crop_name'] != 'No Match']
 
-        if year in train_years:
-            train_df.append(df)
-        elif year in valid_years:
-            valid_df.append(df)
-        elif year in test_years:
-            test_df.append(df)
+            if year in train_years:
+                train_df.append(df)
+            elif year in valid_years:
+                valid_df.append(df)
+            elif year in test_years:
+                test_df.append(df)
 
-    # Concatenate dataframes
+    # Concatenate dataframes across all counties
     train_df = pd.concat(train_df, ignore_index=True) if train_df else None
     valid_df = pd.concat(valid_df, ignore_index=True) if valid_df else None
     test_df = pd.concat(test_df, ignore_index=True) if test_df else None
 
     return train_df, valid_df, test_df
-    
-def dataloader(county_name: str = 'Monterey', batch_size: int = 8):
 
-    base_csv_path = f'/data2/hkaman/Data/FoundationModel/{county_name}/InD/'
 
-    train_df, valid_df, test_df = read_and_split_csf_files(base_csv_path)
-    print(f"{county_name} | train = {train_df.shape[0]}, valid = {valid_df.shape[0]}, test = {test_df.shape[0]}")
+def dataloader(county_names: list = ['Monterey'], batch_size: int = 8):
+
+    base_path = f'/data2/hkaman/Data/FoundationModel/Inputs'
+
+    train_df, valid_df, test_df = read_and_split_csf_files(base_path, county_names)
+    print(f"train = {train_df.shape[0]}, valid = {valid_df.shape[0]}, test = {test_df.shape[0]}")
 
 
     dataset_training = DataGen(
@@ -70,29 +142,36 @@ def dataloader(county_name: str = 'Monterey', batch_size: int = 8):
         test_df
     )  
 
+    train_weights = compute_weights_for_yield_bins(train_df, yield_column="yield", bin_interval=20)
+    train_weights = torch.DoubleTensor(train_weights)
+    train_sampler = torch.utils.data.sampler.WeightedRandomSampler(train_weights, 
+                                                                   len(train_weights), replacement=True)    
+
+    val_weights   = compute_weights_for_yield_bins(valid_df, yield_column="yield", bin_interval=20)
+    val_weights   = torch.DoubleTensor(val_weights)
+    val_sampler   = torch.utils.data.sampler.WeightedRandomSampler(val_weights, 
+                                                                   len(val_weights), replacement=True)    
+    
+    test_weights   = compute_weights_for_yield_bins(test_df, yield_column="yield", bin_interval=20)
+    test_weights   = torch.DoubleTensor(test_weights)
+    test_sampler   = torch.utils.data.sampler.WeightedRandomSampler(test_weights, 
+                                                                   len(test_weights), replacement=True)  
+    
 
     data_loader_training = torch.utils.data.DataLoader(dataset_training, batch_size= batch_size, 
-                                                    shuffle=True,  num_workers=8)  #collate_fn=custom_collate,
+                                                    shuffle=False, sampler=train_sampler,  num_workers=8)  #collate_fn=custom_collate,
     data_loader_validate = torch.utils.data.DataLoader(dataset_validate, batch_size= batch_size, 
-                                                    shuffle=False,  num_workers=8)  
+                                                    shuffle=False, sampler=val_sampler,  num_workers=8)  
     data_loader_test     = torch.utils.data.DataLoader(dataset_test, batch_size=batch_size, 
-                                                    shuffle=False, num_workers=8) 
+                                                    shuffle=False, sampler=test_sampler, num_workers=8) 
 
     return data_loader_training, data_loader_validate, data_loader_test
 
 class DataGen(Dataset):
     def __init__(self, df: pd.DataFrame):
         self.df = df
-        self.base_path = '/data2/hkaman/Data/FoundationModel'
-        self.target_dim = 128  # Fixed target dimension
+        self.base_path = '/data2/hkaman/Data/FoundationModel/Inputs'
 
-        # Define fixed transformation matrices
-        self.weights = {
-            "landsat": np.random.randn(6, self.target_dim),  # (6, 128)
-            "et": np.random.randn(1, self.target_dim),  # (1, 128)
-            "climate": np.random.randn(8, self.target_dim),  # (8, 128)
-            "soil": np.random.randn(5, self.target_dim)  # (5, 128)
-        }
 
     def __len__(self):
         return len(self.df)
@@ -109,24 +188,6 @@ class DataGen(Dataset):
         return np.nan_to_num(standardized, nan=0.0)
     
 
-    def linear_transform(self, tensor):
-        """ Applies a fixed linear transformation to the last dimension (spatial dimension N or M). """
-        tensor = np.asarray(tensor, dtype=np.float32)  
-
-        T, B, N = tensor.shape  
-        weight = np.random.randn(N, 128).astype(np.float32)  
-        tensor_reshaped = tensor.reshape(T * B, N) 
-        # print(tensor_reshaped.shape, weight.shape) 
-        transformed = np.matmul(tensor_reshaped, weight)  
-        transformed = transformed.reshape(T, B, 128)
-        return transformed  
-    
-
-    def mean_reduce(self, tensor):
-        """ Computes the mean across the last dimension. """
-        tensor = np.asarray(tensor, dtype=np.float32)
-        return np.mean(tensor, axis=-1, keepdims=True)  # Shape becomes (X, Y, 1)
-
     def __getitem__(self, idx):
         """ Fetches a single sample and applies transformations. """
         year = self.df.loc[idx, 'year']
@@ -134,8 +195,8 @@ class DataGen(Dataset):
         county = self.df.loc[idx, 'county'].strip()
 
         npz_file_path = os.path.join(self.base_path, f'{county}', 'InD', f'{year}', f'{county}_{year}.npz')
-        loaded_data = np.load(npz_file_path, allow_pickle=True)["input"].item()
-
+        loaded_data = np.load(npz_file_path, allow_pickle=True)["inumpyut"].item()
+     
         # Standardize inputs
         landsat = self.standardized(loaded_data[crop_name]['landsat_data'])  # (12, 6, N)
         et = self.standardized(loaded_data[crop_name]['et_data'][:, :1, :])  # (12, 1, N)
@@ -143,16 +204,24 @@ class DataGen(Dataset):
         soil = self.standardized(loaded_data[crop_name]['soil_data'].reshape(1, 5, -1))  # (1, 5, N)
 
         # Apply transformations
-        landsat_linear =  torch.tensor(self.linear_transform(landsat), dtype=torch.float32)  # (12, 6, 128)
-        et_linear =  torch.tensor(self.linear_transform(et), dtype=torch.float32)  # (12, 1, 128)
-        climate_linear =  torch.tensor(self.linear_transform(climate), dtype=torch.float32)  # (365, 8, 128)
-        soil_linear =  torch.tensor(self.linear_transform(soil), dtype=torch.float32)  # (1, 5, 128)
+        landsat_linear =  torch.tensor(landsat, dtype=torch.float32)  # (12, 6, 128)
+        et_linear =  torch.tensor(et, dtype=torch.float32)  # (12, 1, 128)
+        climate_linear =  torch.tensor(climate, dtype=torch.float32)  # (365, 8, 128)
+        soil_linear =  torch.tensor(soil, dtype=torch.float32)  # (1, 5, 128)
 
-        landsat_mean =  torch.tensor(self.mean_reduce(landsat), dtype=torch.float32)  # (12, 6, 1)
-        et_mean =  torch.tensor(self.mean_reduce(et), dtype=torch.float32)  # (12, 1, 1)
-        climate_mean =  torch.tensor(self.mean_reduce(climate), dtype=torch.float32)  # (365, 8, 1)
-        soil_mean =  torch.tensor(self.mean_reduce(soil), dtype=torch.float32)  # (1, 5, 1)
+        # Generate Unique Vector for Crop Name
+        crop_key = next((k for k, v in util.CDL_CROP_LEGEND.items() if v == crop_name), None)
+        if crop_key is None:
+            raise ValueError(f"Crop name '{crop_name}' not found in CDL_CROP_LEGEND!")
 
+        rng = np.random.RandomState(crop_key)  # Use crop_key as seed for reproducibility
+        crop_vector = rng.rand(128).astype(np.float32)  # Generate a (128,) vector
+
+        # Repeat 12 times and reshape to (12, 1, 128)
+        crop_tensor = torch.tensor(np.tile(crop_vector, (12, 1)), dtype=torch.float32).unsqueeze(1)  # (12, 1, 128)
+
+        # Add crop tensor as an additional channel in et_linear (concatenate along dim=1)
+        et_linear = torch.cat([et_linear, crop_tensor], dim=1)  # Now shape (12, 2, 128)
         # Fetch yield target
         original_y = torch.tensor(self.df.loc[idx]['yield'], dtype=torch.float32)
 
@@ -164,10 +233,10 @@ class DataGen(Dataset):
             "et_linear": et_linear,
             "climate_linear": climate_linear,
             "soil_linear": soil_linear,
-            "landsat_mean": landsat_mean,
-            "et_mean": et_mean,
-            "climate_mean": climate_mean,
-            "soil_mean": soil_mean,
+            # "landsat_mean": landsat_mean,
+            # "et_mean": et_mean,
+            # "climate_mean": climate_mean,
+            # "soil_mean": soil_mean,
             "yield": original_y
         }
 

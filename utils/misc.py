@@ -227,7 +227,7 @@ class FineTune():
             )
 
         best_val_loss  = 1e15 # initial dummy value
-        early_stopping = EarlyStopping(tolerance = 50, min_delta = 50)
+        early_stopping = EarlyStopping(tolerance = 200, min_delta = 200)
         loss_stats = {'train': [],"val": []}
         
 

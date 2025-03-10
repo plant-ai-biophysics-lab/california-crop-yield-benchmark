@@ -14,7 +14,7 @@ import argparse
 def main(args):
 
     data_loader_training, data_loader_validate, data_loader_test = dataloader(
-    county_name='Monterey', batch_size = args.batch_size
+    county_names = ['Monterey', 'Yolo'], batch_size = args.batch_size
     )
 
     config = Configs(
@@ -35,15 +35,15 @@ def main(args):
     M = misc.FineTune(exp_name =  args.exp_name, device =  device)
     yieldbenchmark = M.fit(config)
 
-    M.train(
-        model = yieldbenchmark, 
-        dataloader_train = data_loader_training, 
-        dataloader_valid = data_loader_validate,
-        optimizer =  args.optimizer, 
-        loss =  args.loss, 
-        lr =  args.lr,
-        wd =  args.wd, 
-        epochs=  args.epochs)
+    # M.train(
+    #     model = yieldbenchmark, 
+    #     dataloader_train = data_loader_training, 
+    #     dataloader_valid = data_loader_validate,
+    #     optimizer =  args.optimizer, 
+    #     loss =  args.loss, 
+    #     lr =  args.lr,
+    #     wd =  args.wd, 
+    #     epochs=  args.epochs)
 
     M.predict(model = yieldbenchmark, 
               data_loader = data_loader_training, 
@@ -61,11 +61,11 @@ if __name__ == "__main__":
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Imbalance Deep Yield Estimation")
-    parser.add_argument("--exp_name", type=str, default = "test", help = "Experiment name")
-    parser.add_argument("--batch_size", type=int, default = 1, help = "Batch size")
+    parser.add_argument("--exp_name", type=str, default = "003", help = "Experiment name")
+    parser.add_argument("--batch_size", type=int, default = 2, help = "Batch size")
     parser.add_argument("--embed_dim", type=int, default = 512, help = "Embedding Dimension")
     parser.add_argument("--landsat_channels", type=int, default = 6, help = "The number of landsat channels")
-    parser.add_argument("--et_channels", type=int, default = 1, help = "The number of et channels")
+    parser.add_argument("--et_channels", type=int, default = 2, help = "The number of et channels")
     parser.add_argument("--climate_variables", type=int, default = 8, help = "The number of climate variables")
     parser.add_argument("--soil_variables", type=int, default = 5, help = "The number of soil variables")
     parser.add_argument("--num_heads", type=int, default = 8, help = "The number of heads")
@@ -74,8 +74,8 @@ if __name__ == "__main__":
     parser.add_argument("--proj_dropout", type=float, default = 0.1, help = "Projecttion dropout")
     parser.add_argument("--timeseries", type=str, default = True, help = "Timeseries defult")
     parser.add_argument("--lr", type=float, default = 0.0001, help = "Learning rate")
-    parser.add_argument("--wd", type=float, default = 0.0001, help = "Value of weight decay")
-    parser.add_argument("--epochs", type=int, default = 50, help = "The number of epochs")
+    parser.add_argument("--wd", type=float, default = 0.01, help = "Value of weight decay")
+    parser.add_argument("--epochs", type=int, default = 500, help = "The number of epochs")
     parser.add_argument("--loss", type=str, default = "mse", help = "Loss function")
     parser.add_argument("--optimizer", type=str, default = "adamw", help = "Optimizer")
 
