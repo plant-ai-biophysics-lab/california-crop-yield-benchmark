@@ -1,4 +1,5 @@
 import os
+import glob
 import numpy
 import pandas
 import geopandas
@@ -7,6 +8,8 @@ import rioxarray
 import geojson
 import ee
 import geemap
+from rasterio.merge import merge
+from datetime import datetime
 import rasterio
 from rasterio.enums import Resampling
 from rasterio.warp import calculate_default_transform, reproject
@@ -36,6 +39,7 @@ from concurrent.futures import ThreadPoolExecutor
 # Defults Directries ; 
 
 CA_COUNTIES_SHAPEFILE_DIR = '/data2/hkaman/Data/CDL/California_Counties.geojson'
+CA_SHAPEFILE_DIR = '/data2/hkaman/Data/CDL/ca-state.csv'
 DEFAULT_CRS = 4326
 SAVE_ROOT_DIR = '/data2/hkaman/Data/FoundationModel'
 YIELD_RAW_FILES_DIR = "/data2/hkaman/Data/FoundationModel/YieldObservation"
@@ -564,7 +568,8 @@ class DownloadClimateEE():
         self.year = year 
 
         # Load California counties
-        self.dataframe = geopandas.read_file(CA_COUNTIES_SHAPEFILE_DIR)
+        # self.dataframe = geopandas.read_file(CA_COUNTIES_SHAPEFILE_DIR)
+        self.dataframe = geopandas.read_file(CA_SHAPEFILE_DIR)
         self.dataframe = self.dataframe.to_crs(epsg=DEFAULT_CRS)
 
     def __call__(self):
@@ -572,10 +577,14 @@ class DownloadClimateEE():
     
 
     def get_climate_data_county(self):
-        _, geometry, _, county_name_modified = get_county_info(self.dataframe, self.county_name)
+        # _, geometry, _, county_name_modified = get_county_info(self.dataframe, self.county_name)
+        polygon = self.dataframe.iloc[0].geometry
+        aoi_geojson = geojson.Feature(geometry=mapping(polygon))
+        geometry = aoi_geojson["geometry"]
+
 
         dataset = self.get_daymet_data(geometry)
-
+        county_name_modified = 'CA'
         self.export_image(dataset, county_name_modified)
 
         return dataset
@@ -959,7 +968,6 @@ class ProcessingYieldObs():
         self.county_name = county_name
         self.output_root_dir = output_root_dir
 
-
         self.crop_names = list(CDL_CROP_LEGEND.values())
 
         
@@ -1121,8 +1129,6 @@ class ModelProcessedDataModified:
         self.year = year if isinstance(year, list) else [year]  # Ensure year is a list
         self.crop_names = crop_names
         self.target_crs = "EPSG:32610"  # UTM Zone 10N
-        
-        # Load California counties
         self.dataframe = geopandas.read_file(CA_COUNTIES_SHAPEFILE_DIR)
         self.dataframe = self.dataframe.to_crs(epsg=int(self.target_crs.split(':')[-1]))
 
@@ -1170,7 +1176,6 @@ class ModelProcessedDataModified:
 
 
         outputs = {}
-        output_matrix = {}
 
         landsat_images = self.read_landsat_images()
         et_images = self.read_et_images()
@@ -1178,36 +1183,53 @@ class ModelProcessedDataModified:
         for crop_name in self.crop_names:
             cdl_cultivated_data = self.get_cultivated_area(crop_name = crop_name)
             print(f"{crop_name} | {numpy.sum(cdl_cultivated_data)}")
-            if  numpy.sum(cdl_cultivated_data) > 10000: #(cdl_cultivated_data is not None)
+            if  numpy.sum(cdl_cultivated_data)> 10000: 
                 crop_outputs = {}
-                # crop_outputs_matrix = {}
+                landsat_vector = self.get_masked_landsat_timeseries(landsat_images, cdl_cultivated_data)
+                et_vector = self.get_masked_et_timeseries(et_images, cdl_cultivated_data)
+                climate_vector = self.get_climate_stack(cdl_cultivated_data, daily=daily_climate)
+                soil_vector = self.get_soil_dataset(cdl_cultivated_data)
 
-                if "landsat_data" in requested_outputs:
-                    landsat_vector = self.get_masked_landsat_timeseries(landsat_images, cdl_cultivated_data)
-                    crop_outputs["landsat_data"] = landsat_vector
-                    # crop_outputs_matrix["landsat_data"] = landsat_matrix
+                if any(x is None for x in [landsat_vector, et_vector, climate_vector, soil_vector]):
+                    print(f"Skipping {crop_name} due to missing data")
+                    continue  # Skip this crop
 
-                if "et_data" in requested_outputs:
-                    et_vector = self.get_masked_et_timeseries(et_images, cdl_cultivated_data)
-                    crop_outputs["et_data"] = et_vector
-                    # crop_outputs_matrix["et_data"] = et_matrix
 
-                if "climate_data" in requested_outputs:
-                    climate_vector = self.get_climate_stack(cdl_cultivated_data, daily=daily_climate)
-                    crop_outputs["climate_data"]  = climate_vector
-                    # crop_outputs_matrix["climate_data"] = climate_matrix
+                crop_outputs["landsat_data"] = landsat_vector
+                crop_outputs["et_data"] = et_vector
+                crop_outputs["climate_data"] = climate_vector
+                crop_outputs["soil_data"] = soil_vector
 
-                if "soil_data" in requested_outputs:
-                    soil_vector = self.get_soil_dataset(cdl_cultivated_data)
-                    crop_outputs["soil_data"]  = soil_vector
-                    # crop_outputs_matrix["soil_data"] = soil_matrix
+                print(landsat_vector.shape, et_vector.shape, climate_vector.shape, soil_vector.shape)
+                    # if "landsat_data" in requested_outputs:
+                    #     landsat_vector = self.get_masked_landsat_timeseries(landsat_images, cdl_cultivated_data)
+                    #     crop_outputs["landsat_data"] = landsat_vector
+                    #     print(landsat_vector.shape)
+
+
+                    # if "et_data" in requested_outputs:
+                    #     et_vector = self.get_masked_et_timeseries(et_images, cdl_cultivated_data)
+                    #     crop_outputs["et_data"] = et_vector
+                    #     print(et_vector.shape)
+
+
+                    # if "climate_data" in requested_outputs:
+                    #     climate_vector = self.get_climate_stack(cdl_cultivated_data, daily=daily_climate)
+                    #     crop_outputs["climate_data"]  = climate_vector
+                    #     print(climate_vector.shape)
+
+                    # if "soil_data" in requested_outputs:
+                    #     soil_vector = self.get_soil_dataset(cdl_cultivated_data)
+                    #     crop_outputs["soil_data"]  = soil_vector
+                    #     print(soil_vector.shape)
+
 
                 outputs[crop_name] = crop_outputs
-                # output_matrix[crop_name] = crop_outputs_matrix
+
             
         numpy.savez_compressed(self.output_dir , inumpyut = outputs)
 
-        return outputs#, output_matrix
+        return outputs
 
     def get_reference_grid(self):
         """
@@ -1223,7 +1245,7 @@ class ModelProcessedDataModified:
     def read_landsat_images(self):
         bounds, resolution = self.get_reference_grid()
         landsat_files = self.landsat_files[self.year[0]]
-        
+
         # Use ThreadPoolExecutor for concurrent processing
         with ThreadPoolExecutor() as executor:
             results = list(executor.map(lambda path: self.process_landsat_image(path, bounds, resolution), landsat_files))
@@ -1234,7 +1256,7 @@ class ModelProcessedDataModified:
     def process_landsat_image(self, landsat_path, bounds, resolution):
         """ Read and align a single Landsat image """
         with rasterio.open(landsat_path) as src:
-            landsat_data = src.read()
+            landsat_data = src.read().astype(numpy.float32)  # Convert to float32
             landsat_transform = src.transform
             landsat_crs = src.crs
 
@@ -1250,8 +1272,8 @@ class ModelProcessedDataModified:
                 source_transform=landsat_transform,
                 source_crs=landsat_crs
             )
-            
-        return aligned_landsat
+
+        return aligned_landsat.astype(numpy.float32)  # Ensure final output is also float32
 
     def align_to_geometry(self, reference_bounds, reference_crs, resolution, source_data, source_transform, source_crs):
         """ Align source data to match reference grid CRS, resolution, and bounds. """
@@ -1318,29 +1340,24 @@ class ModelProcessedDataModified:
         """
         Mask Landsat timeseries imagery using the cultivated area and return non-zero pixels as a 3D matrix (T, B, N).
         """
-        vector_timeseries, matrix_timeseries = [], []
+        vector_timeseries = []
    
         for idx in range(12):
             aligned_landsat = landsat[idx]
             mask = cultivated_area > 0  
             masked_vector_landsat = aligned_landsat[:, mask[0, ...]]  
             masked_vector_landsat = numpy.nan_to_num(masked_vector_landsat, nan=0) 
+
             vector_timeseries.append(masked_vector_landsat)  
-                
-            # mask_matrix = numpy.expand_dims(mask, axis=0)
-            # masked_landsat = aligned_landsat * mask_matrix
-            # masked_landsat = numpy.nan_to_num(masked_landsat, nan=0) 
-            # matrix_timeseries.append(masked_landsat)
+ 
+        vector_timeseries_output = stratified_sampling(numpy.stack(vector_timeseries, axis=0).astype(numpy.float32) , num_samples=128) 
 
-        # matrix_timeseries_output = numpy.stack(matrix_timeseries, axis=0)
-        vector_timeseries_output = stratified_sampling(numpy.stack(vector_timeseries, axis=0) , num_samples=128) 
-
-        return vector_timeseries_output#, matrix_timeseries_output[:, 0, ...]
+        return vector_timeseries_output
     
     def process_et_image(self, et_path, bounds, resolution):
 
         with rasterio.open(et_path) as src:
-            et_data = src.read()
+            et_data = src.read().astype(numpy.float32)
             et_transform = src.transform
             et_crs = src.crs
             if et_crs == self.target_crs and et_transform.almost_equals(self.reference_transform, precision=1e-6):
@@ -1355,7 +1372,7 @@ class ModelProcessedDataModified:
                 source_crs = et_crs
             )
 
-        return aligned_et_data
+        return aligned_et_data[0, ...].astype(numpy.float32)
     
     def read_et_images(self):
         bounds, resolution = self.get_reference_grid()
@@ -1370,138 +1387,96 @@ class ModelProcessedDataModified:
         """
         Mask ET timeseries imagery using the cultivated area and stack into a 4D matrix.
         """
-        matrix_timeseries, vector_timeseries = [], []
+        vector_timeseries = []
 
         for idx in range(12):
             aligned_et_data = et_images[idx]
             mask = cultivated_area > 0  
-            vector_masked_et = aligned_et_data[:, mask[0, ...]]  
+            vector_masked_et = aligned_et_data[mask[0, ...]]  
             vector_masked_et = numpy.nan_to_num(vector_masked_et, nan=0) 
             vector_timeseries.append(vector_masked_et)
-            
-            # mask_matrix = numpy.expand_dims(mask, axis=0)
-            # matrix_masked_et = aligned_et_data * mask_matrix
-            # matrix_masked_et = numpy.nan_to_num(matrix_masked_et, nan=0) 
-            # matrix_timeseries.append(matrix_masked_et)
-
-        # matrix_output = numpy.stack(matrix_timeseries, axis=0)
+           
         vector_output = stratified_sampling(numpy.stack(vector_timeseries, axis=0), num_samples=128)
 
         return vector_output#, matrix_output[:, 0, ...]
-    
+
     def get_soil_dataset(self, cultivated_area):
         """
-        Rasterize SSURGO shapefile to match the reference grid and mask it with cultivated area.
-        Extracts 10 key soil attributes from tabular data and returns a unique raster for each attribute.
-
-        Returns:
-            numpy.ndarray: A raster dataset of shape (B, N), where B is the number of soil attributes,
-                        and N is the number of valid pixels (masked by cultivated_area).
+        Rasterize SSURGO shapefile, mask it with cultivated area, and extract soil attributes efficiently.
+        Returns a raster dataset of shape (B, N), where B is the number of soil attributes,
+        and N is the number of valid pixels (masked by cultivated_area).
         """
+        # Load SSURGO polygons and project
+        gdf = geopandas.read_file(self.soil_dir).to_crs(self.target_crs)
 
-        # Load SSURGO spatial map unit polygons
-        gdf = geopandas.read_file(self.soil_dir)
+        # Get reference grid
         bounds, resolution = self.get_reference_grid()
-        gdf = gdf.to_crs(self.target_crs)
-
-        # gdf["MUSYM_CODE"] = gdf["MUSYM"].astype("category").cat.codes
-        # shapes = [(geom, value) for geom, value in zip(gdf.geometry, gdf["MUSYM_CODE"])]
-        shapes = [(geom, int(value)) for geom, value in zip(gdf.geometry, gdf["MUKEY"])]
-
         min_x, min_y, max_x, max_y = bounds
         width = int((max_x - min_x) / resolution[0])
         height = int((max_y - min_y) / resolution[1])
         transform = from_bounds(min_x, min_y, max_x, max_y, width, height)
 
-        
-        raster = rasterize(
-            shapes=shapes,
-            out_shape=(height, width),
-            transform=transform,
-            dtype="int32"
-        )
-
+        # Rasterize using MUKEY
+        shapes = [(geom, int(mukey)) for geom, mukey in zip(gdf.geometry, gdf["MUKEY"])]
+        raster = rasterize(shapes, out_shape=(height, width), transform=transform, dtype=numpy.int32)
 
         # Load tabular data
         tabular_dir = self.soil_dir.rsplit("/", 1)[0].replace("spatial", "tabular")
         muaggatt_df = pandas.read_csv(f"{tabular_dir}/muaggatt.csv")
 
-        # Convert column names to lowercase and strip spaces
+        # Normalize column names
         muaggatt_df.columns = muaggatt_df.columns.str.lower().str.strip()
 
+        # Soil attributes of interest
+
         soil_attributes = [
-            "aws0100wta", "ph1to1h2o_r", "sandtotal_r", "silttotal_r", "claytotal_r", 
-            "claytotal_r", "slopegraddcp", "awmmfpwwta",
-            "drclassdcd", "hydgrpdcd"
+            "aws0100wta", "slopegraddcp", "awmmfpwwta", "drclassdcd", "hydgrpdcd"
         ]
-
-        # Convert MUKEY & COKEY to string before merging
-        if "mukey" in muaggatt_df.columns:
-            muaggatt_df["mukey"] = muaggatt_df["mukey"].astype(str)
-        if "cokey" in muaggatt_df.columns:
-            muaggatt_df["cokey"] = muaggatt_df["cokey"].astype(str)
-
-        # Check if expected soil attributes exist
-        existing_attributes = [attr for attr in soil_attributes if attr in muaggatt_df.columns]
-        # print("Matched Soil Attributes in Data:", existing_attributes)
-
-        # Ensure "mukey" column exists before setting index
+        # Ensure "mukey" exists
         if "mukey" not in muaggatt_df.columns:
             raise ValueError("MUKEY column is missing in the CSV file.")
 
-        # Convert categorical drainage class to numerical values
+        # Convert categorical columns to numeric
         drainage_mapping = {
-            "Excessively drained": 5.0,
-            "Well drained": 4.0,
-            "Moderately well drained": 3.0,
-            "Somewhat poorly drained": 2.0,
-            "Poorly drained": 1.0,
-            "Very poorly drained": 0.0,
+            "Excessively drained": 5.0, "Well drained": 4.0, "Moderately well drained": 3.0,
+            "Somewhat poorly drained": 2.0, "Poorly drained": 1.0, "Very poorly drained": 0.0
         }
-
-        soil_groups__mapping = {
-            "A": 0.0,
-            "B": 1.0,
-            "C": 2.0,
-            "D": 3.0,
-        }
-
+        soil_groups_mapping = {"A": 0.0, "B": 1.0, "C": 2.0, "D": 3.0}
 
         if "drclassdcd" in muaggatt_df.columns:
             muaggatt_df["drclassdcd"] = muaggatt_df["drclassdcd"].map(drainage_mapping).astype(numpy.float32)
-
         if "hydgrpdcd" in muaggatt_df.columns:
-            muaggatt_df["hydgrpdcd"] = muaggatt_df["hydgrpdcd"].map(soil_groups__mapping).astype(numpy.float32)
+            muaggatt_df["hydgrpdcd"] = muaggatt_df["hydgrpdcd"].map(soil_groups_mapping).astype(numpy.float32)
 
+        # Convert mukey to int for efficient indexing
+        muaggatt_df["mukey"] = muaggatt_df["mukey"].astype(int)
+        existing_attributes = [attr for attr in soil_attributes if attr in muaggatt_df.columns]
+        # Create lookup table for soil attributes
+        lookup = muaggatt_df.set_index("mukey")[existing_attributes].to_dict(orient="index")
 
+        # Convert raster to soil attribute arrays
+        mask = cultivated_area[0, ...] > 0
+        N = numpy.count_nonzero(mask)
 
-        mask = cultivated_area[0, ...] > 0  # Shape: (H, W)
-        N = numpy.count_nonzero(mask)  # Number of valid pixels
-
-        soil_maps = numpy.zeros((len(existing_attributes), N), dtype=numpy.float32)
-        out_matrix = []
+        # Convert raster to index-based lookup
+        unique_mukeys = numpy.unique(raster)
+        attribute_matrix = numpy.zeros((len(soil_attributes), height, width), dtype=numpy.float32)
 
 
         for i, attr in enumerate(existing_attributes):
-            attr_map = numpy.zeros_like(raster, dtype=numpy.float32)  
+            attr_values = numpy.array([lookup.get(mukey, {}).get(attr, 0.0) for mukey in unique_mukeys])
+            attr_map = numpy.zeros_like(raster, dtype=numpy.float32)
+            attr_map[raster > 0] = numpy.take(attr_values, numpy.searchsorted(unique_mukeys, raster[raster > 0]))
+            attribute_matrix[i, :, :] = attr_map
 
-            for _, row in muaggatt_df.iterrows():
-                mu_key = row["mukey"]
-                value = row.get(attr, 0.0)  
-                true_indices = numpy.where(raster == numpy.float32(mu_key))
-                attr_map[true_indices] = value 
-            # Extract only non-zero pixels where cultivated area > 0
-            soil_maps[i, :] = attr_map[mask]
-            soil_maps[i, numpy.isnan(soil_maps[i, :])] = 0.0
+        soil_maps = attribute_matrix[:, mask]
+        soil_maps[numpy.isnan(soil_maps)] = 0.0
 
-            # matrix_output = numpy.where(cultivated_area[0] > 0, attr_map, 0)
-            # matrix_output = numpy.nan_to_num(matrix_output, nan=0) 
-            # out_matrix.append(matrix_output)
-            # matrix_outputs = numpy.stack(out_matrix, axis=0)
+        # Stratified sampling
+        vector_output = stratified_sampling(soil_maps.astype(numpy.float32), num_samples=128)
 
-        vector_output = stratified_sampling(soil_maps, num_samples=128)
+        return vector_output.astype(numpy.float32)
 
-        return vector_output#, matrix_outputs
 
     def get_climate_stack(self, cultivated_area, daily: bool = True):
         """
@@ -1544,7 +1519,7 @@ class ModelProcessedDataModified:
                 climate_stack = numpy.stack(
                     [time_slice[var].values for var in variables],
                     axis=0
-                )
+                ).astype(numpy.float32)
 
                 mask = resampled_cultivated_area > 0  # Shape: (H, W)
                 vector_masked_climate_stack = climate_stack[:, mask]  
@@ -1552,16 +1527,12 @@ class ModelProcessedDataModified:
                 vector_timeseries.append(vector_masked_climate_stack)
                 vector_out = numpy.stack(vector_timeseries, axis=0)
 
-                # mask_matrix = numpy.expand_dims(mask, axis=0)
-                # masked_climate_stack = climate_stack * mask_matrix
-                # masked_climate_stack = numpy.nan_to_num(masked_climate_stack, nan=0) 
-                # matrix_timeseries.append(masked_climate_stack)
 
-        vector_output = stratified_sampling(numpy.stack(vector_out, axis=0) , num_samples=128) 
-        # matrix_output = numpy.stack(matrix_timeseries, axis=0)
-
-
-        return vector_output#, matrix_output
+        if numpy.stack(vector_out, axis=0).astype(numpy.float32).shape[-1] != 0:
+            vector_output = stratified_sampling(numpy.stack(vector_out, axis=0).astype(numpy.float32) , num_samples=128)
+            return vector_output.astype(numpy.float32)
+        else: 
+            return None
 
     def resample_cultivated_area(self, cultivated_area, target_shape):
         """
@@ -1593,9 +1564,6 @@ class ModelProcessedDataModified:
 
         # Threshold: Any value > 0 means at least one contributing pixel was 1
         return (resampled_area > 0).astype(numpy.uint8)
-
-
-
 
 
 class ModelProcessedData:
@@ -2410,9 +2378,127 @@ class CountyDataCreator:
         return (resampled_area > 0).astype(numpy.uint8)
 
 
+class MosaicClip:
+    def __init__(self, file_dir, county_names):
+        self.file_dir = file_dir
+        self.county_names = county_names
+
+        self.target_crs = "EPSG:32610"  # UTM Zone 10N
+        self.dataframe = geopandas.read_file(CA_COUNTIES_SHAPEFILE_DIR)
+        # self.dataframe = self.dataframe.to_crs(epsg=int(self.target_crs.split(':')[-1]))
+
+    def align_to_geometry(self, reference_bounds, reference_crs, resolution, source_data, source_transform, source_crs):
+        """ Align source data to match reference grid CRS, resolution, and bounds. """
+        min_x, min_y, max_x, max_y = reference_bounds
+        width = int((max_x - min_x) / resolution[0])
+        height = int((max_y - min_y) / resolution[1])
+        reference_transform = from_bounds(min_x, min_y, max_x, max_y, width, height)
+
+        # Preallocate array for efficiency
+        aligned_data = numpy.empty((source_data.shape[0], height, width), dtype=source_data.dtype)
+
+        for band_index in range(source_data.shape[0]):
+            reproject(
+                source=source_data[band_index],
+                destination=aligned_data[band_index],
+                src_transform=source_transform,
+                src_crs=source_crs,
+                dst_transform=reference_transform,
+                dst_crs=reference_crs,
+                resampling=Resampling.bilinear
+            )
+
+        return aligned_data, reference_transform, (height, width)
+    
+    def get_reference_grid(self):
+        """
+        Create a reference grid based on the county geometry.
+
+        Returns:
+            tuple: (bounds, crs, resolution) of the reference grid.
+        """
+        bounds = self.dataframe[self.dataframe["NAME"] == self.county_name + " County"].total_bounds
+        resolution = (30, 30)  # 30m resolution as Landsat uses
+        return bounds, resolution
+    
+    def create_mosaic(self):
+        # 1. Get list of Landsat files
+        tif_files = glob.glob(os.path.join(self.file_dir, "LT_2022-07-01-*.tif"))
+        if len(tif_files) == 0:
+            raise ValueError("No matching .tif files found.")
+
+        # 2. Extract date from first filename
+        first_filename = os.path.basename(tif_files[0])
+        date_str = first_filename.split("_")[1]  # '2022-07-01'
+        try:
+            date_formatted = datetime.strptime(date_str, "%Y-%m-%d").strftime("%Y%m%d")
+        except:
+            date_formatted = "unknownDate"
+
+        # 3. Open all TIFF files
+        src_files_to_mosaic = [rasterio.open(fp) for fp in tif_files]
+
+        # 4. Mosaic all files
+        mosaic, out_trans = merge(src_files_to_mosaic, resampling=Resampling.nearest)
+        out_meta = src_files_to_mosaic[0].meta.copy()
+        out_meta.update({
+            "driver": "GTiff",
+            "height": mosaic.shape[1],
+            "width": mosaic.shape[2],
+            "transform": out_trans,
+            "compress": "lzw"
+        })
+
+
+        return mosaic, out_meta
+
+    def run(self):
+
+        mosaic, out_meta = self.create_mosaic()
+
+        # # 6. Loop through counties
+        for county in self.county_names:
+    
+            # geometry, polygon, ee_geometry, county_name_modified = get_county_info(df, county)
+            normalized_county_name = county.strip().title() + " County"
+            county_row = self.dataframe[self.dataframe["NAME"] == normalized_county_name]
+            # county_row = df[df['NAME'].str.lower() == county.lower()]
+            if county_row.empty:
+                print(f"County '{county}' not found in shapefile.")
+                continue
+
+            geometry = county_row.geometry.values[0]
+            print()
+            # Clip the mosaic with the county geometry
+            try:
+                clipped, clipped_transform = mask(dataset = mosaic, shapes=[geometry], crop=True)
+            except Exception as e:
+                print(f"Failed to mask for county {county}: {e}")
+                continue
+
+            # Update metadata for clipped image
+            clipped_meta = out_meta.copy()
+            clipped_meta.update({
+                "height": clipped.shape[1],
+                "width": clipped.shape[2],
+                "transform": clipped_transform
+            })
+
+            # Save the clipped image
+            # county_clean_name = county.replace(" ", "_")
+            output_filename = f"{normalized_county_name}.tif"
+            output_path = os.path.join(self.file_dir, output_filename)
+
+            with rasterio.open(output_path, "w", **clipped_meta) as dest:
+                dest.write(clipped)
+
+            print(f"Saved: {output_path}")
+
+
 #***********************************************#
 #****************** Founctions *****************#
 #***********************************************#
+
 
 def stratified_sampling(array, num_samples=128):
     """
@@ -2441,7 +2527,7 @@ def modify_crop_attr_df(county_name: str = 'Yolo'):
         raise FileNotFoundError(f"File not found: {df_path}")
 
     # Read file without header first to check column count
-    df = pd.read_csv(df_path, delimiter="|", header=None)
+    df = pandas.read_csv(df_path, delimiter="|", header=None)
 
     coln_list = [
         'musym', 'muname', 'mustatus', 'slopegraddcp', 'slopegradwta', 
@@ -2605,7 +2691,6 @@ def get_monthly_dates(year, index):
     
     return start_date, end_date
     
-
 def count_tif_files(folder_path):
     """
     Count the number of .tif files within a folder.
@@ -2680,7 +2765,33 @@ def plot_landsat5_rgb(tif_file_path):
         nan_mask = numpy.isnan(array)
         if nan_mask.any():
             array[nan_mask] = numpy.nanmin(array)
-        return (array - array.min()) / (array.max() - array.min())
+        clip_percentile=(2, 98)
+        p_low, p_high = numpy.percentile(array, clip_percentile)    
+        return (array - p_low) / (p_high - p_low)
+    
+    # def normalize(array, clip_percentile=(2, 98)):
+    #     """
+    #     Normalize a NumPy array to [0, 1] range for brighter visualization,
+    #     with optional percentile-based contrast stretching.
+
+    #     Args:
+    #         array (numpy.ndarray): Input array to normalize.
+    #         clip_percentile (tuple): Percentiles for clipping (e.g., (2, 98)).
+
+    #     Returns:
+    #         numpy.ndarray: Normalized array for display.
+    #     """
+    #     nan_mask = numpy.isnan(array)
+    #     if nan_mask.any():
+    #         array[nan_mask] = numpy.nanmin(array)
+
+    #     # Contrast stretching
+    #     p_low, p_high = numpy.percentile(array, clip_percentile)
+    #     array = numpy.clip(array, p_low, p_high)
+
+    #     # Normalize to [0, 1]
+    #     array = (array - p_low) / (p_high - p_low)
+    #     return array
     
     # Open the Landsat file
     with rasterio.open(tif_file_path) as src:
@@ -2689,69 +2800,71 @@ def plot_landsat5_rgb(tif_file_path):
         green_band = src.read(2)  # Green is band 2
         blue_band = src.read(1)  # Blue is band 1
 
-        # Print original shape
-        print(f"Original shape: {red_band.shape}")
-        print(f"Original CRS: {src.crs}")
+        # # Print original shape
+        # print(f"Original shape: {red_band.shape}")
+        # print(f"Original CRS: {src.crs}")
 
-        # Target CRS
-        target_crs = "EPSG:3857"
+        # # Target CRS
+        # target_crs = "EPSG:3857"
 
-        # Calculate transform and new shape for target CRS
-        transform, width, height = calculate_default_transform(
-            src.crs, target_crs, src.width, src.height, *src.bounds
-        )
+        # # Calculate transform and new shape for target CRS
+        # transform, width, height = calculate_default_transform(
+        #     src.crs, target_crs, src.width, src.height, *src.bounds
+        # )
 
         # Prepare arrays for reprojected bands
-        red_reprojected = numpy.empty((height, width), dtype=red_band.dtype)
-        green_reprojected = numpy.empty((height, width), dtype=green_band.dtype)
-        blue_reprojected = numpy.empty((height, width), dtype=blue_band.dtype)
+        # red_reprojected = numpy.empty((height, width), dtype=red_band.dtype)
+        # green_reprojected = numpy.empty((height, width), dtype=green_band.dtype)
+        # blue_reprojected = numpy.empty((height, width), dtype=blue_band.dtype)
 
-        # Reproject each band
-        reproject(
-            source=red_band,
-            destination=red_reprojected,
-            src_transform=src.transform,
-            src_crs=src.crs,
-            dst_transform=transform,
-            dst_crs=target_crs,
-            resampling=Resampling.nearest
-        )
-        reproject(
-            source=green_band,
-            destination=green_reprojected,
-            src_transform=src.transform,
-            src_crs=src.crs,
-            dst_transform=transform,
-            dst_crs=target_crs,
-            resampling=Resampling.nearest
-        )
-        reproject(
-            source=blue_band,
-            destination=blue_reprojected,
-            src_transform=src.transform,
-            src_crs=src.crs,
-            dst_transform=transform,
-            dst_crs=target_crs,
-            resampling=Resampling.nearest
-        )
+        # # Reproject each band
+        # reproject(
+        #     source=red_band,
+        #     destination=red_reprojected,
+        #     src_transform=src.transform,
+        #     src_crs=src.crs,
+        #     dst_transform=transform,
+        #     dst_crs=target_crs,
+        #     resampling=Resampling.nearest
+        # )
+        # reproject(
+        #     source=green_band,
+        #     destination=green_reprojected,
+        #     src_transform=src.transform,
+        #     src_crs=src.crs,
+        #     dst_transform=transform,
+        #     dst_crs=target_crs,
+        #     resampling=Resampling.nearest
+        # )
+        # reproject(
+        #     source=blue_band,
+        #     destination=blue_reprojected,
+        #     src_transform=src.transform,
+        #     src_crs=src.crs,
+        #     dst_transform=transform,
+        #     dst_crs=target_crs,
+        #     resampling=Resampling.nearest
+        # )
 
-        # Print reprojected shape
-        print(f"Reprojected shape: {red_reprojected.shape}")
-        print(f"Reprojected CRS: {target_crs}")
+        # # Print reprojected shape
+        # print(f"Reprojected shape: {red_reprojected.shape}")
+        # print(f"Reprojected CRS: {target_crs}")
 
     # Normalize bands for visualization
-    red = normalize(red_reprojected)
-    green = normalize(green_reprojected)
-    blue = normalize(blue_reprojected)
+    red_band = normalize(red_band)
+    green_band = normalize(green_band)
+    blue_band = normalize(blue_band)
 
     # Stack bands into RGB
-    rgb = numpy.stack([red, green, blue], axis=-1)
+    rgb = numpy.stack([red_band, green_band, blue_band], axis=-1)
 
-    # Plot the RGB image
-    plt.figure(figsize=(10, 10))
-    plt.imshow(rgb)
-    plt.axis('off')  # Remove axis for better visualization
-    plt.title("Reprojected Landsat 5 RGB Image (EPSG:3857)")
+    fig, ax = plt.subplots(figsize=(10, 10))
+    fig.patch.set_facecolor('white')  # Set figure (outside) background
+    ax.set_facecolor('white')         # Set axes (plot area) background
+    ax.imshow(rgb)
+    ax.axis('off')
+    ax.set_title("Reprojected Landsat 5 RGB Image (EPSG:3857)")
+    plt.tight_layout()
     plt.show()
 
 def list_tif_files(folder_path):
@@ -2784,23 +2897,72 @@ def read_tif_by_index(folder_path, index):
     file_path = os.path.join(folder_path, files[index])
     return xarray.open_dataset(file_path, engine="rasterio")#.to_array()
 
+def plot_landsat5_all_bands_by_index(folder_path, index):
+    """
+    Plot all six Landsat 5 bands (RGB, NIR, SWIR1, SWIR2) separately in a 2-row by 3-column layout.
+
+    Args:
+        folder_path (str): Path to the folder containing .tif files.
+        index (int): Index of the file to read.
+
+    Returns:
+        None. Displays the 6-band images.
+    """
+    def normalize(array):
+        """
+        Normalize the array to [0, 1] for better visualization after handling NaN values.
+        """
+        nan_mask = numpy.isnan(array)
+        if nan_mask.any():
+            array[nan_mask] = numpy.nanmin(array)
+
+        norm_array = (array - array.min()) / (array.max() - array.min())
+
+        # Set NaN values (previously no-data regions) to 1 (white)
+        norm_array[nan_mask] = 1.0
+
+        return norm_array
+
+    # Open the .tif file with rioxarray
+    image_xr = read_tif_by_index(folder_path, index)
+    image_xr = image_xr.to_array()
+
+    # Extract bands: Landsat 5 band order is assumed as:
+    # 1: Blue, 2: Green, 3: Red, 4: NIR, 5: SWIR1, 7: SWIR2
+    band_names = ["Blue", "Green", "Red", "NIR", "SWIR1", "SWIR2"]
+    bands = [normalize(image_xr.isel(band=i).values) for i in range(6)]
+
+    # Create figure with a white background
+    fig, axes = plt.subplots(2, 3, figsize=(20, 12), facecolor="white")
+
+    for ax, band, name in zip(axes.flat, bands, band_names):
+        ax.set_facecolor("white")  # Set individual subplot background to white
+        im = ax.imshow(band[0], cmap="gray", vmin=0, vmax=1)  # Plot the band
+        ax.set_title(name, fontsize=12, color="black")  # Set title color to black
+        ax.axis("off")  # Hide axes
+
+    plt.suptitle("Landsat 5 Individual Bands", fontsize=14, fontweight="bold", color="black")
+    plt.tight_layout()
+    plt.show()
+
 def plot_landsat5_rgb_by_index(folder_path, index):
     """
     Plot an RGB image from a Landsat 5 surface reflectance .tif file using rioxarray.
 
     Args:
-        tif_file_path (str): Path to the .tif file.
-    
+        folder_path (str): Path to the folder containing .tif files.
+        index (int): Index of the file to read.
+
     Returns:
         None. Displays the RGB image.
     """
     def normalize(array):
         """
         Normalize the array to [0, 1] for better visualization after handling NaN values.
-        
+
         Args:
-            array (numpy.ndarray): Inumpyut array to normalize.
-        
+            array (numpy.ndarray): Input array to normalize.
+
         Returns:
             numpy.ndarray: Normalized array.
         """
@@ -2809,20 +2971,13 @@ def plot_landsat5_rgb_by_index(folder_path, index):
         if nan_mask.any():
             array[nan_mask] = numpy.nanmin(array)
 
-        # Debug: Print the min and max values of the array
-        # print("Min value:", array.min(), "Max value:", array.max())
-
         # Normalize the array
         return (array - array.min()) / (array.max() - array.min())
-    
+
     # Open the .tif file with rioxarray
     image_xr = read_tif_by_index(folder_path, index)
     image_xr = image_xr.to_array()
-    
-    # Ensure the file has at least 3 bands (RGB)
-    # if image_xr.rio.count < 3:
-    #     raise ValueError(f"The .tif file must have at least 3 bands for RGB. Found {image_xr.rio.count} bands.")
-    
+
     # Select the Red, Green, and Blue bands (3, 2, 1 for Landsat 5)
     red_band = image_xr.isel(band=4)  # Band index is 0-based
     green_band = image_xr.isel(band=3)
@@ -2836,11 +2991,15 @@ def plot_landsat5_rgb_by_index(folder_path, index):
     # Stack the bands into an RGB image
     rgb = numpy.stack([red, green, blue], axis=-1)
 
+    # Convert NaNs to white (1,1,1)
+    rgb = numpy.nan_to_num(rgb, nan=1.0)  # Set NaN values to white (RGB: 1,1,1)
+
     # Plot the RGB image
-    plt.figure(figsize=(10, 10))
-    plt.imshow(rgb[0])
-    plt.axis('off')  # Remove axis for better visualization
-    plt.title("Landsat 5 RGB Image")
+    fig, ax = plt.subplots(figsize=(7, 7))
+    ax.set_facecolor('white')  # Set background color to white
+    im = ax.imshow(rgb[0], vmin=0, vmax=1)  # Ensure correct scaling
+    ax.axis('off')  # Remove axis for better visualization
+    plt.title("Landsat 5 RGB Image", fontsize=14)
     plt.show()
 
 def count_observations_by_month(parent_folder):
@@ -3068,13 +3227,13 @@ def plot_datasets(landsat_data, et_data, climate_data, soil_data):
         """
         min = numpy.nanmin(array)
         max = numpy.nanmax(array)
-        print(f"before: {min}, {max}")
+
         array = numpy.nan_to_num(array, nan=0)  # Replace NaN with 0
         # p5, p95 = numpy.percentile(array, [5, 95])  # Compute 5th and 95th percentiles
         # print(p5, p95)
         min = numpy.nanmin(array)
         max = numpy.nanmax(array)
-        print(min, max)
+
         # array = numpy.clip(array, p5, p95)  # Clip values to the percentile range
         normalized = (array - min) / (max - min + 1e-10)  # Normalize to [0, 1]
         return numpy.clip(normalized * brightness, 0, 1) 
@@ -3156,3 +3315,318 @@ def plot_datasets(landsat_data, et_data, climate_data, soil_data):
 
     plt.show()
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+def clean_crop_data(county_name:str):
+
+    main_dir = os.path.join(SAVE_ROOT_DIR, f'Inputs/{county_name}/InD')
+    # Define years (excluding 2012)
+    years = [str(year) for year in range(2008, 2023) if year != 2012]
+    # Define names to remove
+    remove_names = {'Other Crops', 'Other Tree Crops', 'Other'}
+
+    for year in years:
+        year_folder = os.path.join(main_dir, year)
+        if not os.path.isdir(year_folder):
+            print(f"Skipping missing folder: {year_folder}")
+            continue
+
+        # Find CSV file in the year folder
+        csv_files = [f for f in os.listdir(year_folder) if f.endswith('.csv')]
+        if not csv_files:
+            print(f"No CSV file found in {year_folder}")
+            continue
+        csv_path = os.path.join(year_folder, csv_files[0])
+
+        # Load and clean CSV
+        df = pandas.read_csv(csv_path)
+        if 'key_crop_name' not in df.columns:
+            print(f"'key_crop_name' column not found in {csv_path}")
+            continue
+
+        df_cleaned = df[~df['key_crop_name'].isin(remove_names)]
+
+        # Overwrite original CSV
+        df_cleaned.to_csv(csv_path, index=False)
+        print(f"Cleaned and saved: {csv_path}")
+
+def aggregate_duplicate_crops(county_name:str):
+
+    main_dir = os.path.join(SAVE_ROOT_DIR, f'Inputs/{county_name}/InD')
+
+
+    years = [str(y) for y in range(2008, 2023) if y != 2012]
+
+    for year in years:
+        year_folder = os.path.join(main_dir, year)
+        if not os.path.isdir(year_folder):
+            print(f"Missing folder: {year_folder}")
+            continue
+
+        csv_files = [f for f in os.listdir(year_folder) if f.endswith('.csv')]
+        if not csv_files:
+            print(f"No CSV file in {year_folder}")
+            continue
+
+        csv_path = os.path.join(year_folder, csv_files[0])
+        df = pandas.read_csv(csv_path)
+
+        if 'key_crop_name' not in df.columns:
+            print(f"'key_crop_name' column missing in {csv_path}")
+            continue
+
+        # Check for duplicates
+        if df['key_crop_name'].duplicated().any():
+            # Aggregate
+            aggregated_df = df.groupby('key_crop_name').agg({
+                'harvested_acres': 'sum',
+                'production': 'sum',
+                'yield': 'mean',
+                'crop_name': lambda x: list(x.unique()),
+                'county': 'first',
+                'year': 'first'
+            }).reset_index()
+
+            # Save the new aggregated CSV
+            aggregated_df.to_csv(csv_path, index=False)
+            print(f"Aggregated and saved: {csv_path}")
+        else:
+            print(f"No duplicates to aggregate in: {csv_path}")
+
+def count_samples_by_crop_and_year(county_name:str):
+
+    main_dir = os.path.join(SAVE_ROOT_DIR, f'Inputs/{county_name}/InD')
+
+    years = [str(y) for y in range(2008, 2023) if y != 2012]
+    crop_year_counts = {}
+
+    for year in years:
+        year_folder = os.path.join(main_dir, year)
+        if not os.path.isdir(year_folder):
+            print(f"Skipping missing folder: {year_folder}")
+            continue
+
+        csv_files = [f for f in os.listdir(year_folder) if f.endswith('.csv')]
+        if not csv_files:
+            print(f"No CSV file in {year_folder}")
+            continue
+
+        csv_path = os.path.join(year_folder, csv_files[0])
+        df = pandas.read_csv(csv_path)
+
+        if 'key_crop_name' not in df.columns:
+            print(f"'key_crop_name' column missing in {csv_path}")
+            continue
+
+        counts = df['key_crop_name'].value_counts()
+        crop_year_counts[year] = counts
+
+    # Combine all into a single DataFrame
+    summary_df = pandas.DataFrame(crop_year_counts).fillna(0).astype(int)
+    summary_df.index.name = 'key_crop_name'
+    return summary_df
+
+
+
+def remove_crops_missing_from_any_year(county_name:str):
+
+    main_dir = os.path.join(SAVE_ROOT_DIR, f'Inputs/{county_name}/InD')
+
+    years = [str(y) for y in range(2008, 2023) if y != 2012]
+    crop_sets_by_year = {}
+
+    # Step 1: Gather crop names present in each year
+    for year in years:
+        year_folder = os.path.join(main_dir, year)
+        if not os.path.isdir(year_folder):
+            print(f"Skipping: {year_folder}")
+            continue
+
+        csv_files = [f for f in os.listdir(year_folder) if f.endswith('.csv')]
+        if not csv_files:
+            print(f"No CSV in: {year_folder}")
+            continue
+
+        csv_path = os.path.join(year_folder, csv_files[0])
+        df = pandas.read_csv(csv_path)
+
+        if 'key_crop_name' not in df.columns:
+            print(f"'key_crop_name' missing in: {csv_path}")
+            continue
+
+        crop_sets_by_year[year] = set(df['key_crop_name'].dropna().unique())
+
+    # Step 2: Find crops that are common to *all* years
+    common_crops = set.intersection(*crop_sets_by_year.values())
+
+    # Step 3: Remove crops not in common_crops from each CSV and overwrite
+    for year in years:
+        year_folder = os.path.join(main_dir, year)
+        csv_files = [f for f in os.listdir(year_folder) if f.endswith('.csv')]
+        if not csv_files:
+            continue
+
+        csv_path = os.path.join(year_folder, csv_files[0])
+        df = pandas.read_csv(csv_path)
+
+        if 'key_crop_name' not in df.columns:
+            continue
+
+        cleaned_df = df[df['key_crop_name'].isin(common_crops)]
+        cleaned_df.to_csv(csv_path, index=False)
+        print(f"Cleaned {csv_path} to keep only crops in ALL years.")
+
+    print(f"✅ Crops retained across all years: {sorted(common_crops)}")
+
+def filter_csv_by_npz_keys(county_name:str):
+
+
+    main_dir = os.path.join(SAVE_ROOT_DIR, f'Inputs/{county_name}/InD')
+    years = [str(y) for y in range(2008, 2023) if y != 2012]
+
+    for year in years:
+        year_folder = os.path.join(main_dir, year)
+        if not os.path.isdir(year_folder):
+            print(f"Skipping missing folder: {year_folder}")
+            continue
+            
+        # Get CSV file
+        csv_files = [f for f in os.listdir(year_folder) if f.endswith('.csv')]
+        if not csv_files:
+            print(f"No CSV file in {year_folder}")
+            continue
+        csv_path = os.path.join(year_folder, csv_files[0])
+
+        # Get NPZ file
+        npz_files = [f for f in os.listdir(year_folder) if f.endswith('.npz')]
+        if not npz_files:
+            print(f"No NPZ file in {year_folder}")
+            continue
+        npz_path = os.path.join(year_folder, npz_files[0])
+
+        # Load CSV and NPZ
+        df = pandas.read_csv(csv_path)
+
+        npz_dict = dict(numpy.load(npz_path, allow_pickle=True)["inumpyut"].item())
+        valid_keys = set(npz_dict.keys())
+
+        # print(f"{year}:{df['key_crop_name'].unique()} | {valid_keys}")
+        # Filter rows where key_crop_name IS in the dictionary keys
+        if 'key_crop_name' not in df.columns:
+            print(f"'key_crop_name' not found in {csv_path}")
+            continue
+
+        original_len = len(df)
+        df_filtered = df[df['key_crop_name'].isin(valid_keys)]
+
+        # Save the cleaned CSV
+        df_filtered.to_csv(csv_path, index=False)
+        print(f"[{year}] Kept {len(df_filtered)}/{original_len} rows in {csv_path}")
+
+
+
+def plot_tiff_files(folder_path):
+    # Get a list of all TIFF files in the folder
+    tiff_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith('.tiff') or f.endswith('.tif')]
+
+    # Sort files for consistent order
+    tiff_files.sort()
+
+    # Month names for titles
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+
+    # Read all TIFF files and store data in a list
+    data_list = []
+    for tiff_file in tiff_files:
+        with rasterio.open(tiff_file) as src:
+            data = src.read(1)  # Read the first band
+            # data = np.nan_to_num(data)
+            data_list.append(data)
+
+    # Determine the global min and max values across all files
+    global_min = min([np.nanmin(data) for data in data_list])
+    global_max = max([np.nanmax(data) for data in data_list])
+    
+    # Set up the plot grid
+    fig, axes = plt.subplots(2, 6, figsize=(17, 6), constrained_layout=True)
+    axes = axes.flatten()
+
+    # Plot each TIFF file
+    for i, (data, ax) in enumerate(zip(data_list, axes)):
+        im = ax.imshow(data, cmap='viridis', vmin=global_min, vmax=global_max)
+        ax.set_facecolor("white")
+        ax.set_title(months[i], fontsize=10)
+        ax.axis('off')
+
+    # Remove any unused subplots
+    for ax in axes[len(data_list):]:
+        ax.axis('off')
+
+    cbar = fig.colorbar(im, ax=axes, orientation='horizontal', fraction=0.05, pad=0.04, aspect=50)
+    cbar.set_label('ET Value')
+
+    plt.show()
+
+
+def extract_formatted_date(filename):
+    """
+    Extracts and formats the date from a Landsat filename as 'YYYY_MM_DD'.
+    
+    Expected filename format: 'LT_YYYY-MM-DD-xxxxxxxxxx-xxxxxxxxxx.tif'
+    
+    Returns:
+        A string like '2022_07_01'
+    """
+    base = os.path.basename(filename)
+    
+    # Use regex to find the date pattern
+    match = re.search(r'LT_(\d{4})-(\d{2})-(\d{2})', base)
+    if match:
+        year, month, day = match.groups()
+        return f"{year}_{month}_{day}"
+    else:
+        raise ValueError("Date not found or filename format is incorrect.")
+
+
+def create_mosaic(dir):
+    # 1. Get list of Landsat files
+    tif_files = glob.glob(os.path.join(dir, "*.tif"))
+
+    formatted_date = extract_formatted_date(tif_files[0])
+
+
+    if len(tif_files) == 0:
+        raise ValueError("No matching .tif files found.")
+
+    # 2. Open all TIFF files
+    src_files_to_mosaic = [rasterio.open(fp) for fp in tif_files]
+
+    # 3. Mosaic all files
+    mosaic, out_trans = merge(src_files_to_mosaic, resampling=Resampling.nearest)
+
+    # 4. Force data to float32
+    mosaic = mosaic.astype(numpy.float32)
+
+    # 5. Update metadata
+    out_meta = src_files_to_mosaic[0].meta.copy()
+    out_meta.update({
+        "driver": "GTiff",
+        "height": mosaic.shape[1],
+        "width": mosaic.shape[2],
+        "transform": out_trans,
+        "compress": "lzw",
+        "dtype": "float32"
+    })
+
+    return mosaic, out_meta, formatted_date

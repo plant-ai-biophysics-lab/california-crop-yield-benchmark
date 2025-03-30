@@ -52,39 +52,68 @@ from dataset import dataset_wrapper as util
 
 #     return train_df, valid_df, test_df
 
-def compute_weights_for_yield_bins(df, yield_column="yield", bin_interval=20):
+# def compute_weights_for_yield_bins(df, yield_column="yield", bin_interval=20):
+#     """
+#     Compute sample weights for each yield bin for PyTorch's WeightedRandomSampler.
+
+#     Parameters:
+#     - df (pd.DataFrame): DataFrame containing a column with yield values.
+#     - yield_column (str): Name of the yield column.
+#     - bin_interval (int): The interval for binning yield values.
+
+#     Returns:
+#     - torch.Tensor: A tensor of weights for each sample in df.
+#     """
+#     # Define bins (0 to 200 with steps of 20)
+#     bins = np.arange(0, 60, bin_interval)  # 220 ensures inclusion of 200
+#     bin_labels = np.arange(len(bins) - 1)  # Assign bin indices (0, 1, 2, ...)
+
+#     # Assign bin labels to each yield value
+#     df["yield_bin"] = pd.cut(df[yield_column], bins=bins, labels=bin_labels, include_lowest=True)
+
+#     # Count the number of occurrences in each bin
+#     bin_counts = df["yield_bin"].value_counts().sort_index()
+
+#     # Compute inverse frequency (higher weight for less frequent bins)
+#     bin_weights = 1.0 / (bin_counts + 1e-6)  # Avoid division by zero
+
+#     # Normalize weights so they sum to 1
+#     bin_weights /= bin_weights.sum()
+
+#     # Assign weight to each sample based on its bin
+#     sample_weights = df["yield_bin"].map(bin_weights)
+
+#     # Convert to PyTorch tensor
+#     return sample_weights #torch.tensor(sample_weights.values, dtype=torch.float32)
+
+
+def compute_weights_for_yield_bins(df, yield_column="yield", bin_interval=10):
     """
     Compute sample weights for each yield bin for PyTorch's WeightedRandomSampler.
-
-    Parameters:
-    - df (pd.DataFrame): DataFrame containing a column with yield values.
-    - yield_column (str): Name of the yield column.
-    - bin_interval (int): The interval for binning yield values.
-
-    Returns:
-    - torch.Tensor: A tensor of weights for each sample in df.
     """
-    # Define bins (0 to 200 with steps of 20)
-    bins = np.arange(0, 220, bin_interval)  # 220 ensures inclusion of 200
-    bin_labels = np.arange(len(bins) - 1)  # Assign bin indices (0, 1, 2, ...)
+    # Define bins
+    max_yield = df[yield_column].max()
+    bins = np.arange(0, max_yield + bin_interval, bin_interval)
+    bin_labels = np.arange(len(bins) - 1)
 
-    # Assign bin labels to each yield value
+    # Assign bins
     df["yield_bin"] = pd.cut(df[yield_column], bins=bins, labels=bin_labels, include_lowest=True)
 
-    # Count the number of occurrences in each bin
+    # Drop rows with NaN bins
+    df = df.dropna(subset=["yield_bin"])
+
+    # Count per bin
     bin_counts = df["yield_bin"].value_counts().sort_index()
 
-    # Compute inverse frequency (higher weight for less frequent bins)
-    bin_weights = 1.0 / (bin_counts + 1e-6)  # Avoid division by zero
-
-    # Normalize weights so they sum to 1
+    # Inverse frequency
+    bin_weights = 1.0 / (bin_counts + 1e-6)
     bin_weights /= bin_weights.sum()
 
-    # Assign weight to each sample based on its bin
-    sample_weights = df["yield_bin"].map(bin_weights)
+    # Map weights (convert to float so we can fill NaNs)
+    sample_weights = df["yield_bin"].map(bin_weights).astype(float)
 
-    # Convert to PyTorch tensor
-    return sample_weights #torch.tensor(sample_weights.values, dtype=torch.float32)
+    # Fill any NaNs and return tensor
+    return torch.tensor(sample_weights.fillna(0.0).values, dtype=torch.float32)
 
 
 def read_and_split_csf_files(base_path, county_names):
@@ -142,18 +171,18 @@ def dataloader(county_names: list = ['Monterey'], batch_size: int = 8):
         test_df
     )  
 
-    train_weights = compute_weights_for_yield_bins(train_df, yield_column="yield", bin_interval=20)
-    train_weights = torch.DoubleTensor(train_weights)
+    train_weights = compute_weights_for_yield_bins(train_df, yield_column="yield", bin_interval=10)
+    # train_weights = torch.DoubleTensor(train_weights)
     train_sampler = torch.utils.data.sampler.WeightedRandomSampler(train_weights, 
                                                                    len(train_weights), replacement=True)    
 
-    val_weights   = compute_weights_for_yield_bins(valid_df, yield_column="yield", bin_interval=20)
-    val_weights   = torch.DoubleTensor(val_weights)
+    val_weights   = compute_weights_for_yield_bins(valid_df, yield_column="yield", bin_interval=10)
+    # val_weights   = torch.DoubleTensor(val_weights)
     val_sampler   = torch.utils.data.sampler.WeightedRandomSampler(val_weights, 
                                                                    len(val_weights), replacement=True)    
     
-    test_weights   = compute_weights_for_yield_bins(test_df, yield_column="yield", bin_interval=20)
-    test_weights   = torch.DoubleTensor(test_weights)
+    test_weights   = compute_weights_for_yield_bins(test_df, yield_column="yield", bin_interval=10)
+    # test_weights   = torch.DoubleTensor(test_weights)
     test_sampler   = torch.utils.data.sampler.WeightedRandomSampler(test_weights, 
                                                                    len(test_weights), replacement=True)  
     
@@ -193,36 +222,43 @@ class DataGen(Dataset):
         year = self.df.loc[idx, 'year']
         crop_name = self.df.loc[idx, 'key_crop_name'].strip()
         county = self.df.loc[idx, 'county'].strip()
-
+        # print(f"{year} | {crop_name} | {county}")
         npz_file_path = os.path.join(self.base_path, f'{county}', 'InD', f'{year}', f'{county}_{year}.npz')
         loaded_data = np.load(npz_file_path, allow_pickle=True)["inumpyut"].item()
      
         # Standardize inputs
+        et_raw = loaded_data[crop_name]['et_data']
+        if et_raw.ndim == 3:  # shape is (12, C, N)
+            et = self.standardized(et_raw[:, :1, :])  # select first channel
+        elif et_raw.ndim == 2:  # shape is (12, N)
+            et = self.standardized(np.expand_dims(et_raw, axis=1))  # add channel dim → (12, 1, N)
+        else:
+            raise ValueError(f"Unexpected ET data shape: {et_raw.shape}")
+
+
         landsat = self.standardized(loaded_data[crop_name]['landsat_data'])  # (12, 6, N)
-        et = self.standardized(loaded_data[crop_name]['et_data'][:, :1, :])  # (12, 1, N)
+        # et = self.standardized(loaded_data[crop_name]['et_data'][:, :1, :])  # (12, 1, N)
         climate = self.standardized(loaded_data[crop_name]['climate_data'])  # (365, 8, M)
         soil = self.standardized(loaded_data[crop_name]['soil_data'].reshape(1, 5, -1))  # (1, 5, N)
 
-        # Apply transformations
+
         landsat_linear =  torch.tensor(landsat, dtype=torch.float32)  # (12, 6, 128)
         et_linear =  torch.tensor(et, dtype=torch.float32)  # (12, 1, 128)
         climate_linear =  torch.tensor(climate, dtype=torch.float32)  # (365, 8, 128)
         soil_linear =  torch.tensor(soil, dtype=torch.float32)  # (1, 5, 128)
 
-        # Generate Unique Vector for Crop Name
+
         crop_key = next((k for k, v in util.CDL_CROP_LEGEND.items() if v == crop_name), None)
         if crop_key is None:
             raise ValueError(f"Crop name '{crop_name}' not found in CDL_CROP_LEGEND!")
 
-        rng = np.random.RandomState(crop_key)  # Use crop_key as seed for reproducibility
-        crop_vector = rng.rand(128).astype(np.float32)  # Generate a (128,) vector
+        rng = np.random.RandomState(crop_key)  
+        crop_vector = rng.rand(128).astype(np.float32)  
 
-        # Repeat 12 times and reshape to (12, 1, 128)
-        crop_tensor = torch.tensor(np.tile(crop_vector, (12, 1)), dtype=torch.float32).unsqueeze(1)  # (12, 1, 128)
+        crop_tensor = torch.tensor(np.tile(crop_vector, (12, 1)), dtype=torch.float32).unsqueeze(1) 
 
-        # Add crop tensor as an additional channel in et_linear (concatenate along dim=1)
         et_linear = torch.cat([et_linear, crop_tensor], dim=1)  # Now shape (12, 2, 128)
-        # Fetch yield target
+  
         original_y = torch.tensor(self.df.loc[idx]['yield'], dtype=torch.float32)
 
         sample = {
@@ -233,10 +269,6 @@ class DataGen(Dataset):
             "et_linear": et_linear,
             "climate_linear": climate_linear,
             "soil_linear": soil_linear,
-            # "landsat_mean": landsat_mean,
-            # "et_mean": et_mean,
-            # "climate_mean": climate_mean,
-            # "soil_mean": soil_mean,
             "yield": original_y
         }
 
