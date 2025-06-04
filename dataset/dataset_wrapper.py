@@ -35,14 +35,19 @@ import json
 from skimage.transform import resize
 from rapidfuzz import process, fuzz  
 from concurrent.futures import ThreadPoolExecutor
+import re
+import shutil
+
+
+
 
 # Defults Directries ; 
 
-CA_COUNTIES_SHAPEFILE_DIR = '/data2/hkaman/Data/CDL/California_Counties.geojson'
-CA_SHAPEFILE_DIR = '/data2/hkaman/Data/CDL/ca-state.csv'
+CA_COUNTIES_SHAPEFILE_DIR = '/data2/hkaman/Data/YieldBenchmark/SHPs/California_Counties.geojson'
+CA_SHAPEFILE_DIR = '/data2/hkaman/Data/YieldBenchmark/SHPs/ca-state.csv'
 DEFAULT_CRS = 4326
-SAVE_ROOT_DIR = '/data2/hkaman/Data/FoundationModel'
-YIELD_RAW_FILES_DIR = "/data2/hkaman/Data/FoundationModel/YieldObservation"
+SAVE_ROOT_DIR = '/data2/hkaman/Data/YieldBenchmark'
+YIELD_RAW_FILES_DIR = "/data2/hkaman/Data/YieldBenchmark/YieldObservation"
  
 
 CDL_CROP_LEGEND = {
@@ -1133,11 +1138,11 @@ class ModelProcessedDataModified:
         self.dataframe = self.dataframe.to_crs(epsg=int(self.target_crs.split(':')[-1]))
 
         # Base directory
-        root_dir = '/data2/hkaman/Data/FoundationModel/Inputs'
+        root_dir = '/data2/hkaman/Data/YieldBenchmark/counties'
         self.output_dir = os.path.join(root_dir,county_name, f"InD/{self.year[0]}/{county_name}_{self.year[0]}")
 
         # Paths for each year
-        self.cdl_paths = [os.path.join(root_dir, county_name, f"Raw/CDL/{yr}/{county_name}_{yr}.tif") for yr in self.year]
+        self.cdl_paths = [os.path.join(root_dir, county_name, f"Raw/CDL/{yr}/{county_name}_CDL_{yr}.tif") for yr in self.year]
         self.landsat_dirs = [os.path.join(root_dir, county_name, f"Raw/Landsat/{yr}/") for yr in self.year]
         self.landsat_files = {
             yr: sorted([os.path.join(dir, f) for f in os.listdir(dir) if f.endswith(".tif")])
@@ -1148,7 +1153,7 @@ class ModelProcessedDataModified:
             yr: sorted([os.path.join(dir, f) for f in os.listdir(dir) if f.endswith(".tif")])
             for yr, dir in zip(self.year, self.et_dirs)
         }
-        self.climate_paths = [os.path.join(root_dir, county_name, f"Raw/Climate/{yr}/DayMet_{county_name}_{yr}.nc") for yr in self.year]
+        self.climate_paths = [os.path.join(root_dir, county_name, f"Raw/Climate/{yr}/{county_name}_DayMet_{yr}.nc") for yr in self.year]
         import glob
         self.soil_dir = glob.glob(os.path.join(root_dir, county_name, "Raw/Soil/spatial/soilmu_a_*.shp"))
 
@@ -1238,7 +1243,18 @@ class ModelProcessedDataModified:
         Returns:
             tuple: (bounds, crs, resolution) of the reference grid.
         """
-        bounds = self.dataframe[self.dataframe["NAME"] == self.county_name + " County"].total_bounds
+        if self.county_name == 'ContraCosta':
+            new_name = 'Contra Costa'
+        elif self.county_name == 'SanBenito':
+            new_name = 'San Benito'
+        elif self.county_name == 'SanDiego':
+            new_name = 'San Diego'
+        elif self.county_name == 'SanJoaquin':
+            new_name = 'San Joaquin'
+        else:
+            new_name = self.county_name
+
+        bounds = self.dataframe[self.dataframe["NAME"] == new_name + " County"].total_bounds
         resolution = (30, 30)  # 30m resolution as Landsat uses
         return bounds, resolution
     
@@ -2519,8 +2535,10 @@ def stratified_sampling(array, num_samples=128):
         T, B, N = array.shape
         return numpy.percentile(array, percentiles, axis=-1).transpose(1, 2, 0)  # Ensure (T, B, 128)
     
-def modify_crop_attr_df(county_name: str = 'Yolo'):
-    root_path = f'/data2/hkaman/Data/FoundationModel/Inputs/{county_name}/Raw/Soil/tabular'
+def modify_soil_attr_df(county_name: str = 'Yolo'):
+
+    root_path = f'/data2/hkaman/Data/YieldBenchmark/counties/{county_name}/Raw/Soil/tabular'
+    # root_path = '/data2/hkaman/Data/FoundationModel/CASoilData/tabular'
     df_path = os.path.join(root_path, 'muaggatt.txt')
     
     if not os.path.exists(df_path):
@@ -2545,17 +2563,15 @@ def modify_crop_attr_df(county_name: str = 'Yolo'):
     else:
         raise ValueError("The number of columns in the file does not match the expected column names.")
 
+
     # List of relevant soil attributes
     soil_attributes = [
-        "aws0100wta", "ph1to1h2o_r", "sandtotal_r", "silttotal_r", "claytotal_r", 
-        "slopegraddcp", "awmmfpwwta", "drclassdcd", "hydgrpdcd", "mukey", "cokey"
+        "aws0100wta", "slopegraddcp", "awmmfpwwta", "drclassdcd", "hydgrpdcd", "mukey", "cokey"
     ]
 
     # Select only available columns
     available_columns = [col for col in soil_attributes if col in df.columns]
     df_new = df[available_columns].copy()
-
-
 
     # Fill NaN values using the closest row first (bfill + ffill)
     df_new.fillna(method='bfill', inplace=True)  # Fill with next valid value
@@ -2566,7 +2582,7 @@ def modify_crop_attr_df(county_name: str = 'Yolo'):
         if df_new[col].isna().sum() > 0:  # Check if NaNs are still present
             non_nan_values = df_new[col].dropna().values
             if len(non_nan_values) > 0:
-                df_new[col] = df_new[col].apply(lambda x: numpy.random.choice(non_nan_values) if pd.isna(x) else x)
+                df_new[col] = df_new[col].apply(lambda x: numpy.random.choice(non_nan_values) if pandas.isna(x) else x)
 
     df_new.to_csv(os.path.join(root_path, 'muaggatt.csv'))
     return df_new
@@ -3002,47 +3018,94 @@ def plot_landsat5_rgb_by_index(folder_path, index):
     plt.title("Landsat 5 RGB Image", fontsize=14)
     plt.show()
 
-def count_observations_by_month(parent_folder):
+def detect_tif_size_outliers(directory, tolerance_mb=10):
+    """
+    Detect .tif files in the directory that differ significantly in size from the others.
+
+    Parameters:
+    - directory (str): Path to the folder containing .tif files
+    - tolerance_mb (int): Size deviation threshold in megabytes (default: 10 MB)
+    """
+
+    for year_folder in sorted(os.listdir(directory)):
+        year_path = os.path.join(directory, year_folder)
+
+        tif_files = [f for f in sorted(os.listdir(year_path)) if f.lower().endswith('.tif')]
+        sizes = []
+
+        for file in tif_files:
+            file_path = os.path.join(year_path, file)
+            size_mb = os.path.getsize(file_path) / (1024 * 1024)  # Convert bytes to MB
+            sizes.append((file, size_mb))
+
+        if not sizes:
+            print("No .tif files found.")
+            return
+
+        # Compute median size as baseline
+        size_values = [s for _, s in sizes]
+        median_size = sorted(size_values)[len(size_values) // 2]
+
+        print(f"Median file size: {median_size:.2f} MB")
+        print(f"Files with size difference > {tolerance_mb} MB:")
+
+        outliers = []
+        for file, size in sizes:
+            if abs(size - median_size) > tolerance_mb:
+                outliers.append((file, size))
+
+        if outliers:
+            for file, size in outliers:
+                print(f"  - {file} ({size:.2f} MB)")
+        else:
+            print("  None 🚀")
+            
+def count_observations_by_month(parent_folder, county_name: str):
     """
     Counts the number of observations (TIF files) per month for each year across subfolders
     and outputs a CSV file.
-    
+
     Args:
         parent_folder (str): Path to the parent folder (e.g., YOLO).
-    
+
     Returns:
         pd.DataFrame: A DataFrame with years as rows, months as columns, and counts of observations.
     """
-    # Dictionary to store counts with (year, month) as key
     observations = defaultdict(int)
-    
-    # Traverse subfolders
+
     for year_folder in sorted(os.listdir(parent_folder)):
         year_path = os.path.join(parent_folder, year_folder)
-        # Check if the subfolder is named as a year (e.g., 1985, 1986, ...)
+
         if os.path.isdir(year_path) and year_folder.isdigit() and len(year_folder) == 4:
             year = int(year_folder)
+
             for file in os.listdir(year_path):
                 if file.endswith(".tif"):
-                    parts = file.split("_")
-                    if len(parts) == 3:
-                        date = parts[2][:-4] # Extract the date (yyyymmdd)
-                        if len(date) == 8 and date.isdigit():
-                            month = int(date[4:6])
-                            observations[(year, month)] += 1
+                    parts = file[:-4].split("_")  # remove .tif and split by "_"
+                    if len(parts) == 4:
+                        try:
+                            file_year = int(parts[2])
+                            month = int(parts[3])
+                            if file_year == year:
+                                observations[(year, month)] += 1
+                        except ValueError:
+                            print(f"Skipping file due to invalid date parts: {file}")
 
-    # Create a DataFrame from the counts
+    # Create DataFrame
     years = sorted(set(year for year, _ in observations.keys()))
-    months = [f"{month:02}" for month in range(1, 13)]  # Columns for months
-    data = {month: [observations.get((year, int(month)), 0) for year in years] for month in months}
+    months = [f"{month:02}" for month in range(1, 13)]
+    data = {
+        month: [observations.get((year, int(month)), 0) for year in years]
+        for month in months
+    }
     df = pandas.DataFrame(data, index=years)
     df.index.name = "Year"
-    
+
     # Save to CSV
-    output_csv = os.path.join(parent_folder, "observations_per_month.csv")
+    output_csv = os.path.join(parent_folder, f"{county_name}_opm.csv")
     df.to_csv(output_csv)
     print(f"CSV file saved at: {output_csv}")
-    
+
     return df
 
 def rename_tif_files(folder_path):
@@ -3316,13 +3379,221 @@ def plot_datasets(landsat_data, et_data, climate_data, soil_data):
     plt.show()
 
 
+def plot_soil_vars(attribute_matrix):
+
+    soil_attributes = [
+    "aws0100wta", "slopegraddcp", "awmmfpwwta", "drclassdcd", "hydgrpdcd"
+    ]
+    
+    fig, axes = plt.subplots(1, 5, figsize=(20, 3), facecolor='white')
+
+    # Plot each soil variable
+    for i in range(5):
+        ax = axes[i]
+        im = ax.imshow(attribute_matrix[i], cmap='viridis', aspect='auto')
+        ax.set_facecolor("white")
+        ax.set_title(soil_attributes[i])
+        ax.axis("off")  # Hide axes for better visualization
+        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+    # Adjust layout
+    plt.tight_layout()
+    plt.show()
+
+
+def ca_soil_vars_gen():
+
+    target_crs = "EPSG:32610"
+
+    root_dir = '/data2/hkaman/Data/FoundationModel/Inputs'
+
+    dataframe = geopandas.read_file('/data2/hkaman/Data/FoundationModel/SHPs/CASHP/CA_State.shp')
+    dataframe = dataframe.to_crs(epsg=int(target_crs.split(':')[-1]))
+
+    gdf = geopandas.read_file('/data2/hkaman/Data/FoundationModel/CASoilData/spatial/gsmsoilmu_a_ca.shp').to_crs(target_crs)
+
+    # Get reference grid
+    bounds = dataframe.total_bounds
+    resolution = (30, 30)
+
+    min_x, min_y, max_x, max_y = bounds
+    width = int((max_x - min_x) / resolution[0])
+    height = int((max_y - min_y) / resolution[1])
+    transform = from_bounds(min_x, min_y, max_x, max_y, width, height)
+
+    # Rasterize using MUKEY
+    shapes = [(geom, int(mukey)) for geom, mukey in zip(gdf.geometry, gdf["MUKEY"])]
+    raster = rasterize(shapes, out_shape=(height, width), transform=transform, dtype=numpy.int32)
+
+    # Load tabular data
+
+    tabular_dir = '/data2/hkaman/Data/FoundationModel/CASoilData/tabular'
+    muaggatt_df = pandas.read_csv(f"{tabular_dir}/muaggatt.csv")
+
+    # Normalize column names
+    muaggatt_df.columns = muaggatt_df.columns.str.lower().str.strip()
+
+    # Soil attributes of interest
+
+    soil_attributes = [
+        "aws0100wta", "slopegraddcp", "awmmfpwwta", "drclassdcd", "hydgrpdcd"
+    ]
+    # Ensure "mukey" exists
+    if "mukey" not in muaggatt_df.columns:
+        raise ValueError("MUKEY column is missing in the CSV file.")
+
+    # Convert categorical columns to numeric
+    drainage_mapping = {
+        "Excessively drained": 5.0, "Well drained": 4.0, "Moderately well drained": 3.0,
+        "Somewhat poorly drained": 2.0, "Poorly drained": 1.0, "Very poorly drained": 0.0
+    }
+    soil_groups_mapping = {"A": 0.0, "B": 1.0, "C": 2.0, "D": 3.0}
+
+    if "drclassdcd" in muaggatt_df.columns:
+        muaggatt_df["drclassdcd"] = muaggatt_df["drclassdcd"].map(drainage_mapping).astype(numpy.float32)
+    if "hydgrpdcd" in muaggatt_df.columns:
+        muaggatt_df["hydgrpdcd"] = muaggatt_df["hydgrpdcd"].map(soil_groups_mapping).astype(numpy.float32)
+
+    # Convert mukey to int for efficient indexing
+    muaggatt_df["mukey"] = muaggatt_df["mukey"].astype(int)
+    existing_attributes = [attr for attr in soil_attributes if attr in muaggatt_df.columns]
+    # Create lookup table for soil attributes
+    lookup = muaggatt_df.set_index("mukey")[existing_attributes].to_dict(orient="index")
+
+    # Convert raster to index-based lookup
+    unique_mukeys = numpy.unique(raster)
+    attribute_matrix = numpy.full((len(soil_attributes), height, width), numpy.nan, dtype=numpy.float32)
+
+    for i, attr in enumerate(existing_attributes):
+        attr_values = numpy.array([lookup.get(mukey, {}).get(attr, numpy.nan) for mukey in unique_mukeys])  # Default NaN instead of 0
+        attr_map = numpy.full_like(raster, numpy.nan, dtype=numpy.float32)  # Initialize with NaN
+        valid_pixels = raster > 0  # Identify valid raster pixels
+        attr_map[valid_pixels] = numpy.take(attr_values, numpy.searchsorted(unique_mukeys, raster[valid_pixels]))
+        attribute_matrix[i, :, :] = attr_map  # Store in matrix
+
+
+    return attribute_matrix
+
+
+
+def soil_vars_gen(county_name: str):
+
+    target_crs = "EPSG:32610"
+
+    root_dir = '/data2/hkaman/Data/FoundationModel/Inputs'
+
+    dataframe = geopandas.read_file(CA_COUNTIES_SHAPEFILE_DIR)
+    dataframe = dataframe.to_crs(epsg=int(target_crs.split(':')[-1]))
+
+    soil_dir = glob.glob(os.path.join(root_dir, county_name, "Raw/Soil/spatial/soilmu_a_*.shp"))
+    soil_dir = soil_dir[0] 
+
+    gdf = geopandas.read_file(soil_dir).to_crs(target_crs)
+
+    # Get reference grid
+    bounds = dataframe[dataframe["NAME"] == county_name + " County"].total_bounds
+    resolution = (30, 30)
+
+    min_x, min_y, max_x, max_y = bounds
+    width = int((max_x - min_x) / resolution[0])
+    height = int((max_y - min_y) / resolution[1])
+    transform = from_bounds(min_x, min_y, max_x, max_y, width, height)
+
+    # Rasterize using MUKEY
+    shapes = [(geom, int(mukey)) for geom, mukey in zip(gdf.geometry, gdf["MUKEY"])]
+    raster = rasterize(shapes, out_shape=(height, width), transform=transform, dtype=numpy.int32)
+
+    # Load tabular data
+    tabular_dir = soil_dir.rsplit("/", 1)[0].replace("spatial", "tabular")
+    muaggatt_df = pandas.read_csv(f"{tabular_dir}/muaggatt.csv")
+
+    # Normalize column names
+    muaggatt_df.columns = muaggatt_df.columns.str.lower().str.strip()
+
+    # Soil attributes of interest
+
+    soil_attributes = [
+        "aws0100wta", "slopegraddcp", "awmmfpwwta", "drclassdcd", "hydgrpdcd"
+    ]
+    # Ensure "mukey" exists
+    if "mukey" not in muaggatt_df.columns:
+        raise ValueError("MUKEY column is missing in the CSV file.")
+
+    # Convert categorical columns to numeric
+    drainage_mapping = {
+        "Excessively drained": 5.0, "Well drained": 4.0, "Moderately well drained": 3.0,
+        "Somewhat poorly drained": 2.0, "Poorly drained": 1.0, "Very poorly drained": 0.0
+    }
+    soil_groups_mapping = {"A": 0.0, "B": 1.0, "C": 2.0, "D": 3.0}
+
+    if "drclassdcd" in muaggatt_df.columns:
+        muaggatt_df["drclassdcd"] = muaggatt_df["drclassdcd"].map(drainage_mapping).astype(numpy.float32)
+    if "hydgrpdcd" in muaggatt_df.columns:
+        muaggatt_df["hydgrpdcd"] = muaggatt_df["hydgrpdcd"].map(soil_groups_mapping).astype(numpy.float32)
+
+    # Convert mukey to int for efficient indexing
+    muaggatt_df["mukey"] = muaggatt_df["mukey"].astype(int)
+    existing_attributes = [attr for attr in soil_attributes if attr in muaggatt_df.columns]
+    # Create lookup table for soil attributes
+    lookup = muaggatt_df.set_index("mukey")[existing_attributes].to_dict(orient="index")
+
+    # Convert raster to index-based lookup
+    unique_mukeys = numpy.unique(raster)
+    attribute_matrix = numpy.full((len(soil_attributes), height, width), numpy.nan, dtype=numpy.float32)
+
+    for i, attr in enumerate(existing_attributes):
+        attr_values = numpy.array([lookup.get(mukey, {}).get(attr, numpy.nan) for mukey in unique_mukeys])  # Default NaN instead of 0
+        attr_map = numpy.full_like(raster, numpy.nan, dtype=numpy.float32)  # Initialize with NaN
+        valid_pixels = raster > 0  # Identify valid raster pixels
+        attr_map[valid_pixels] = numpy.take(attr_values, numpy.searchsorted(unique_mukeys, raster[valid_pixels]))
+        attribute_matrix[i, :, :] = attr_map  # Store in matrix
+
+
+    return attribute_matrix
 
 
 
 
+def rename_folders_and_files(base_path):
+    base_path = Path(base_path)
 
+    # Loop through all counties
+    for county_folder in base_path.iterdir():
+        if county_folder.is_dir():
+            # Step 1: Rename county folder if it contains "_"
+            original_name = county_folder.name
+            new_name = original_name.replace('_', '')
+            new_county_path = base_path / new_name
 
+            if original_name != new_name:
+                print(f"Renaming county folder: {original_name} -> {new_name}")
+                shutil.move(str(county_folder), str(new_county_path))
+            else:
+                new_county_path = county_folder
 
+            # Step 2: Go into Raw/Landsat
+            landsat_folder = new_county_path / "Raw" / "Landsat"
+            if not landsat_folder.exists():
+                print(f"Skipping missing Landsat folder: {landsat_folder}")
+                continue
+
+            # Step 3: Loop through year folders
+            for year_folder in landsat_folder.iterdir():
+                if year_folder.is_dir() and year_folder.name != '2012':
+                    year = year_folder.name
+
+                    for tif_file in year_folder.glob("*.tif"):
+                        # Match any of these formats: LT_2008_01_01, LT_2008-01-01, County_2008_01_01
+                        match = re.search(r'(\d{4})[-_](\d{2})[-_](\d{2})', tif_file.stem)
+                        if match:
+                            yr, month, day = match.groups()
+                            new_filename = f"{new_name}_{yr}_{month}_01.tif"
+                            new_file_path = tif_file.parent / new_filename
+
+                            print(f"Renaming: {tif_file.name} -> {new_filename}")
+                            tif_file.rename(new_file_path)
+                        else:
+                            print(f"Skipping file (unmatched format): {tif_file.name}")
 
 
 
@@ -3330,7 +3601,7 @@ def plot_datasets(landsat_data, et_data, climate_data, soil_data):
 
 def clean_crop_data(county_name:str):
 
-    main_dir = os.path.join(SAVE_ROOT_DIR, f'Inputs/{county_name}/InD')
+    main_dir = os.path.join(SAVE_ROOT_DIR, f'counties/{county_name}/InD')
     # Define years (excluding 2012)
     years = [str(year) for year in range(2008, 2023) if year != 2012]
     # Define names to remove
@@ -3363,7 +3634,7 @@ def clean_crop_data(county_name:str):
 
 def aggregate_duplicate_crops(county_name:str):
 
-    main_dir = os.path.join(SAVE_ROOT_DIR, f'Inputs/{county_name}/InD')
+    main_dir = os.path.join(SAVE_ROOT_DIR, f'counties/{county_name}/InD')
 
 
     years = [str(y) for y in range(2008, 2023) if y != 2012]
@@ -3406,7 +3677,7 @@ def aggregate_duplicate_crops(county_name:str):
 
 def count_samples_by_crop_and_year(county_name:str):
 
-    main_dir = os.path.join(SAVE_ROOT_DIR, f'Inputs/{county_name}/InD')
+    main_dir = os.path.join(SAVE_ROOT_DIR, f'counties/{county_name}/InD')
 
     years = [str(y) for y in range(2008, 2023) if y != 2012]
     crop_year_counts = {}
@@ -3441,7 +3712,7 @@ def count_samples_by_crop_and_year(county_name:str):
 
 def remove_crops_missing_from_any_year(county_name:str):
 
-    main_dir = os.path.join(SAVE_ROOT_DIR, f'Inputs/{county_name}/InD')
+    main_dir = os.path.join(SAVE_ROOT_DIR, f'counties/{county_name}/InD')
 
     years = [str(y) for y in range(2008, 2023) if y != 2012]
     crop_sets_by_year = {}
@@ -3492,7 +3763,7 @@ def remove_crops_missing_from_any_year(county_name:str):
 def filter_csv_by_npz_keys(county_name:str):
 
 
-    main_dir = os.path.join(SAVE_ROOT_DIR, f'Inputs/{county_name}/InD')
+    main_dir = os.path.join(SAVE_ROOT_DIR, f'counties/{county_name}/InD')
     years = [str(y) for y in range(2008, 2023) if y != 2012]
 
     for year in years:

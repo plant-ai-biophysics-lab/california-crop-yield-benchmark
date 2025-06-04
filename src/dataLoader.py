@@ -151,11 +151,70 @@ def read_and_split_csf_files(base_path, county_names):
     return train_df, valid_df, test_df
 
 
+
+
+def compute_crop_stats(df):
+    """Compute mean and std for yield per crop in the training set."""
+    return df.groupby('key_crop_name')['yield'].agg(['mean', 'std']).to_dict(orient='index')
+
+def normalize_using_stats(df, stats):
+    """Normalize yield using provided crop-wise statistics."""
+    if df is None:
+        return None
+    df = df.copy()
+    df['yield'] = df.apply(
+        lambda row: (row['yield'] - stats[row['key_crop_name']]['mean']) / stats[row['key_crop_name']]['std']
+        if row['key_crop_name'] in stats and stats[row['key_crop_name']]['std'] != 0 else 0, axis=1
+    )
+    return df
+
+# def read_and_split_csf_files(base_path, county_names):
+#     """Reads and splits CSV files for multiple counties, normalizes yield using training set, and returns normalization stats."""
+
+#     train_years = list(range(2008, 2012)) + list(range(2013, 2019))  # Excludes 2012
+#     valid_years = [2019, 2020]
+#     test_years = [2021, 2022]
+
+#     train_df, valid_df, test_df = [], [], []
+
+#     for county in county_names:
+#         for year in range(2008, 2023):
+#             folder_path = os.path.join(base_path, county, "InD", str(year))
+#             csv_file = os.path.join(folder_path, f"yield_{year}.csv")
+
+#             if year == 2012 or not os.path.exists(csv_file):
+#                 continue
+
+#             df = pd.read_csv(csv_file)
+#             df = df[df['key_crop_name'] != 'No Match']
+
+#             if year in train_years:
+#                 train_df.append(df)
+#             elif year in valid_years:
+#                 valid_df.append(df)
+#             elif year in test_years:
+#                 test_df.append(df)
+
+#     # Concatenate
+#     train_df = pd.concat(train_df, ignore_index=True) if train_df else None
+#     valid_df = pd.concat(valid_df, ignore_index=True) if valid_df else None
+#     test_df = pd.concat(test_df, ignore_index=True) if test_df else None
+
+#     # Compute stats from train only
+#     crop_stats = compute_crop_stats(train_df)
+
+#     # Normalize using training stats
+#     train_df = normalize_using_stats(train_df, crop_stats)
+#     valid_df = normalize_using_stats(valid_df, crop_stats)
+#     test_df = normalize_using_stats(test_df, crop_stats)
+
+#     return train_df, valid_df, test_df, crop_stats
+
 def dataloader(county_names: list = ['Monterey'], batch_size: int = 8):
 
-    base_path = f'/data2/hkaman/Data/FoundationModel/Inputs'
+    base_path = f'/data2/hkaman/Data/YieldBenchmark/counties'
 
-    train_df, valid_df, test_df = read_and_split_csf_files(base_path, county_names)
+    train_df, valid_df, test_df = read_and_split_csf_files(base_path, county_names) #crop_stats
     print(f"train = {train_df.shape[0]}, valid = {valid_df.shape[0]}, test = {test_df.shape[0]}")
 
 
@@ -199,7 +258,7 @@ def dataloader(county_names: list = ['Monterey'], batch_size: int = 8):
 class DataGen(Dataset):
     def __init__(self, df: pd.DataFrame):
         self.df = df
-        self.base_path = '/data2/hkaman/Data/FoundationModel/Inputs'
+        self.base_path = '/data2/hkaman/Data/YieldBenchmark/counties'
 
 
     def __len__(self):
@@ -223,7 +282,19 @@ class DataGen(Dataset):
         crop_name = self.df.loc[idx, 'key_crop_name'].strip()
         county = self.df.loc[idx, 'county'].strip()
         # print(f"{year} | {crop_name} | {county}")
-        npz_file_path = os.path.join(self.base_path, f'{county}', 'InD', f'{year}', f'{county}_{year}.npz')
+        if county == 'Contra Costa':
+            new_name = 'ContraCosta'
+        elif county == 'San Benito':
+            new_name = 'SanBenito'
+        elif county == 'San Diego':
+            new_name = 'SanDiego'
+        elif county == 'San Joaquin':
+            new_name = 'SanJoaquin'
+        else:
+            new_name = county
+
+
+        npz_file_path = os.path.join(self.base_path, f'{new_name}', 'InD', f'{year}', f'{new_name}_{year}.npz')
         loaded_data = np.load(npz_file_path, allow_pickle=True)["inumpyut"].item()
      
         # Standardize inputs
@@ -263,7 +334,7 @@ class DataGen(Dataset):
 
         sample = {
             "year": year, 
-            "county": county, 
+            "county": new_name, 
             "crop_name": crop_name,
             "landsat_linear": landsat_linear,
             "et_linear": et_linear,

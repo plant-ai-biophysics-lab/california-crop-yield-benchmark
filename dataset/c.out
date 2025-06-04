@@ -1,0 +1,23 @@
+nohup: ignoring input
+['Apples', 'Apricots', 'Broccoli', 'Celery', 'Cherries', 'Grapes', 'Greens', 'Lettuce', 'Olives', 'Other Hay/Non Alfalfa', 'Walnuts']
+/home/hkaman/miniconda3/envs/vit/lib/python3.11/site-packages/rasterio/warp.py:344: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.
+  _reproject(
+Apples | 405048
+(12, 6, 128) (12, 128) (365, 8, 128) (5, 128)
+Apricots | 0
+Broccoli | 0
+Celery | 0
+Cherries | 503444
+(12, 6, 128) (12, 128) (365, 8, 128) (5, 128)
+Grapes | 1197972
+(12, 6, 128) (12, 128) (365, 8, 128) (5, 128)
+Greens | 0
+Lettuce | 1998652
+(12, 6, 128) (12, 128) (365, 8, 128) (5, 128)
+Olives | 220042
+(12, 6, 128) (12, 128) (365, 8, 128) (5, 128)
+Other Hay/Non Alfalfa | 264260
+(12, 6, 128) (12, 128) (365, 8, 128) (5, 128)
+Walnuts | 651311
+(12, 6, 128) (12, 128) (365, 8, 128) (5, 128)
+2022 is done!

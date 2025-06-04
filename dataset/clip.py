@@ -8,7 +8,8 @@ import geopandas
 from rasterio.mask import mask
 from rasterio.io import MemoryFile
 import re
-
+import geopandas
+import dataset_wrapper as util
 
 def extract_formatted_date(filename):
     """
@@ -63,17 +64,17 @@ def create_mosaic(dir):
     return mosaic, out_meta, formatted_date
 
 
-a2_county_names = ['Stanislaus']
+# a2_county_names = ['Inyo', 'Mono', 'San Benito', 'Santa Cruz', 'Santa Clara', 'San Mateo', 'Mariposa', 'Tuolumne']
+a1_county_names = ['Riverside', 'San Diego', 'Ventura', 'Kern', 'Orange', 'San Bernardino', 'San Luis Obispo']
 
-import geopandas
-import dataset_wrapper as util
+
 dataframe = geopandas.read_file(util.CA_COUNTIES_SHAPEFILE_DIR)
 
-for p in range(1, 77):
-    mosaic, out_meta, formatted_date = create_mosaic(f'/data2/hkaman/Data/FoundationModel/DD/P{p}')
+for p in range(67, 151):
+    mosaic, out_meta, formatted_date = create_mosaic(f'/data2/hkaman/Data/FoundationModel/A/P{p}')
     year = formatted_date.split("_")[0] 
 
-    for county in a2_county_names:
+    for county in a1_county_names:
         
         normalized_county_name = county.strip().title() + " County"
         county_row = dataframe[dataframe["NAME"] == normalized_county_name]
@@ -105,7 +106,13 @@ for p in range(1, 77):
                 output_filename = f"{county_clean_name}_{formatted_date}.tif"
                 output_path = os.path.join(output_root, output_filename)
 
-                with rasterio.open(output_path, "w", **clipped_meta) as dest:
-                    dest.write(clipped)
+                # Only write the file if it does not already exist
+                if not os.path.exists(output_path):
+                    with rasterio.open(output_path, "w", **clipped_meta) as dest:
+                        dest.write(clipped)
+                    print(f"File {output_path} saved!")
+                else:
+                    print(f"File already exists, skipping: {output_path}")
 
-                print(f"Saved: {output_path}")
+
+                
