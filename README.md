@@ -113,9 +113,9 @@ _Link coming soon_
 
 ## 📷 Example Visualizations
 
-![Climate Sample](images/cdl_sample.png)
+![Climate Sample](images/climate_sample.png)
 ![ET Sample](images/et_sample.png)
-![Soil Sample](images/saoil_sample.png)
+![Soil Sample](images/soil_sample.png)
 
 ---
 
