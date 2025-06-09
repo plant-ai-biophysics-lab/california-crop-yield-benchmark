@@ -8,36 +8,31 @@ import rioxarray
 import geojson
 import ee
 import geemap
-from rasterio.merge import merge
-from datetime import datetime
+import json
+from datetime import datetime, date, timedelta
 import rasterio
 from rasterio.enums import Resampling
 from rasterio.warp import calculate_default_transform, reproject
 from rasterio.features import rasterize
 from rasterio.transform import from_origin, from_bounds
 from rasterio.mask import mask
+from rasterio.merge import merge
 import requests
 from typing import List, Union
-from datetime import date, timedelta
 import zipfile
-from pynhd import NLDI
 from collections import defaultdict
 from shapely.geometry import shape, mapping
 from shapely.ops import unary_union
-from shapely import wkt
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
-import seaborn as sns
 from pathlib import Path
 import pydaymet as daymet
 import calendar
-import json
 from skimage.transform import resize
 from rapidfuzz import process, fuzz  
 from concurrent.futures import ThreadPoolExecutor
 import re
 import shutil
-
 
 
 
@@ -2510,12 +2505,9 @@ class MosaicClip:
 
             print(f"Saved: {output_path}")
 
-
 #***********************************************#
 #****************** Founctions *****************#
 #***********************************************#
-
-
 def stratified_sampling(array, num_samples=128):
     """
     Apply stratified sampling along the last dimension of an array with shape (..., N).
@@ -2625,8 +2617,6 @@ def get_county_info(dataframe, county_name):
 
     return geometry, polygon, ee_geometry, county_name_modified
 
-
-
 def get_county_geometry(self, county_name: str):
     """
     Retrieve the geometry of a specified county.
@@ -2682,9 +2672,6 @@ def get_flexible_geometry(geometry):
     else:
         raise ValueError(f"Unsupported geometry type: {geometry['type']}")
     return eeg
-
-
-
 
 def get_monthly_dates(year, index):
     """
@@ -3378,7 +3365,6 @@ def plot_datasets(landsat_data, et_data, climate_data, soil_data):
 
     plt.show()
 
-
 def plot_soil_vars(attribute_matrix):
 
     soil_attributes = [
@@ -3399,7 +3385,6 @@ def plot_soil_vars(attribute_matrix):
     # Adjust layout
     plt.tight_layout()
     plt.show()
-
 
 def ca_soil_vars_gen():
 
@@ -3473,8 +3458,6 @@ def ca_soil_vars_gen():
 
 
     return attribute_matrix
-
-
 
 def soil_vars_gen(county_name: str):
 
@@ -3551,9 +3534,6 @@ def soil_vars_gen(county_name: str):
 
     return attribute_matrix
 
-
-
-
 def rename_folders_and_files(base_path):
     base_path = Path(base_path)
 
@@ -3594,10 +3574,6 @@ def rename_folders_and_files(base_path):
                             tif_file.rename(new_file_path)
                         else:
                             print(f"Skipping file (unmatched format): {tif_file.name}")
-
-
-
-
 
 def clean_crop_data(county_name:str):
 
@@ -3708,8 +3684,6 @@ def count_samples_by_crop_and_year(county_name:str):
     summary_df.index.name = 'key_crop_name'
     return summary_df
 
-
-
 def remove_crops_missing_from_any_year(county_name:str):
 
     main_dir = os.path.join(SAVE_ROOT_DIR, f'counties/{county_name}/InD')
@@ -3805,8 +3779,6 @@ def filter_csv_by_npz_keys(county_name:str):
         df_filtered.to_csv(csv_path, index=False)
         print(f"[{year}] Kept {len(df_filtered)}/{original_len} rows in {csv_path}")
 
-
-
 def plot_tiff_files(folder_path):
     # Get a list of all TIFF files in the folder
     tiff_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith('.tiff') or f.endswith('.tif')]
@@ -3849,7 +3821,6 @@ def plot_tiff_files(folder_path):
 
     plt.show()
 
-
 def extract_formatted_date(filename):
     """
     Extracts and formats the date from a Landsat filename as 'YYYY_MM_DD'.
@@ -3868,7 +3839,6 @@ def extract_formatted_date(filename):
         return f"{year}_{month}_{day}"
     else:
         raise ValueError("Date not found or filename format is incorrect.")
-
 
 def create_mosaic(dir):
     # 1. Get list of Landsat files
@@ -3901,3 +3871,165 @@ def create_mosaic(dir):
     })
 
     return mosaic, out_meta, formatted_date
+
+def reproject_and_plot_cdl(cdl_path, target_crs='EPSG:32610'):
+    """
+    Reproject a CDL raster to a target CRS and plot it using a provided color map.
+
+    Parameters:
+    - cdl_path (str): Path to the CDL raster file.
+    - target_crs (str): Target coordinate reference system. Default is EPSG:32610.
+    - cdl_colors (dict): Dictionary mapping CDL codes to RGB colors.
+    """
+
+    with rasterio.open(cdl_path) as src:
+        src_crs = src.crs
+        src_transform = src.transform
+        src_width = src.width
+        src_height = src.height
+        nodata_value = src.nodata
+
+        transform, width, height = calculate_default_transform(
+            src_crs, target_crs, src_width, src_height, *src.bounds
+        )
+
+        reprojected_data = np.empty((height, width), dtype=src.meta['dtype'])
+
+        reproject(
+            source=src.read(1),
+            destination=reprojected_data,
+            src_transform=src_transform,
+            src_crs=src_crs,
+            dst_transform=transform,
+            dst_crs=target_crs,
+            resampling=Resampling.nearest
+        )
+
+    cmap = ListedColormap([CDL_COLORS[key] for key in sorted(CDL_COLORS.keys())])
+    cdl_data_masked = np.ma.masked_where(reprojected_data == nodata_value, reprojected_data)
+
+    plt.figure(figsize=(12, 10))
+    show(cdl_data_masked, cmap=cmap, transform=transform)
+    plt.title("Reprojected CDL Raster")
+    plt.axis('off')
+    plt.show()
+
+def clip_cdl_by_counties(year: str, county_names: list):
+    """
+    Clips a CDL GeoTIFF by a list of county geometries and saves each one.
+
+    Parameters:
+    - cdl_path: str, path to the CDL GeoTIFF file.
+    - counties_gdf: GeoDataFrame, contains geometries and a column 'county_name'.
+    - county_names: list of str, list of county names to clip and save.
+    - output_dir: str, directory to save the clipped rasters.
+
+    Returns:
+    - None
+
+    """ 
+
+    dataframe = geopandas.read_file(CA_COUNTIES_SHAPEFILE_DIR)
+    cdl_path  = f'/data2/hkaman/Data/YieldBenchmark/CDLs/{year}/CA_CDL_{year}.TIF'
+    with rasterio.open(cdl_path) as src:
+        raster_crs = src.crs
+        dataframe = dataframe.to_crs(raster_crs)
+
+        for county in county_names:
+            output_dir = f'/data2/hkaman/Data/YieldBenchmark/counties/{county}/Raw/CDL/{year}'
+            os.makedirs(output_dir, exist_ok=True)
+
+
+            normalized_county_name = county.strip().title() + " County"
+            county_row = dataframe[dataframe["NAME"] == normalized_county_name]
+
+            county_geom = county_row.geometry.values[0]
+            try:
+                out_image, out_transform = mask(
+                    dataset = src,
+                    shapes = [county_geom],
+                    crop = True,
+                    nodata = src.nodata
+                )
+
+                out_meta = src.meta.copy()
+                out_meta.update({
+                    "driver": "GTiff",
+                    "height": out_image.shape[1],
+                    "width": out_image.shape[2],
+                    "transform": out_transform
+                })
+
+                out_path = os.path.join(output_dir, f"{county.replace(' ', '_')}_{year}.tif")
+                with rasterio.open(out_path, "w", **out_meta) as dest:
+                    dest.write(out_image)
+
+                print(f"Saved {out_path}")
+            except Exception as e:
+                print(f"Failed to clip {county}: {e}")
+
+
+
+def process_and_plot_daymet_climate(root_dir, county_name, yr, target_crs="EPSG:32610", daily=True):
+    """
+    Loads, reprojects, stacks, and plots DayMet climate data for a given county and year.
+
+    Parameters:
+    - root_dir (str): Root directory of the dataset.
+    - county_name (str): Name of the county.
+    - yr (int): Year of the data.
+    - target_crs (str): CRS to project the data into. Default: EPSG:32610.
+    - daily (bool): Whether to use daily timesteps or monthly averages. Default: True.
+
+    Returns:
+    - vector_out (np.ndarray): Array with shape (T, V, H, W) where T is time, V is variable count.
+    """
+
+    climate_path = os.path.join(root_dir, county_name, f"Raw/Climate/{yr}/DayMet_{county_name}_{yr}.nc")
+    variables = ['tmin', 'tmax', 'prcp', 'dayl', 'srad', 'vp', 'snow', 'pet']
+    variable_names = variables.copy()
+
+    # Load data and assign CRS
+    daymet_crs = "+proj=lcc +lat_1=25 +lat_2=60 +lat_0=42.5 +lon_0=-100 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
+    climate_data = xarray.open_dataset(climate_path)[variables].rio.write_crs(daymet_crs)
+
+    # Reproject to target CRS and clip to bounds
+    climate_data = climate_data.rio.reproject(target_crs, resolution=(1000, 1000))
+    climate_data = climate_data.rio.clip_box(*climate_data.rio.bounds())
+
+    # Convert time series to stacked format
+    time_steps = climate_data.time
+    vector_timeseries = []
+
+    for time_step in time_steps:
+        time_slice = climate_data.sel(time=time_step) if daily else climate_data.sel(month=time_step)
+        climate_stack = numpy.stack(
+            [time_slice[var].values for var in variables],
+            axis=0
+        ).astype(numpy.float32)
+
+        vector_timeseries.append(climate_stack)
+
+    vector_out = numpy.stack(vector_timeseries, axis=0)  # (T, V, H, W)
+
+    # Plot a sample time step (e.g., 180th day)
+    sample_index = 180 if vector_out.shape[0] > 180 else vector_out.shape[0] // 2
+    fig, axs = plt.subplots(2, 4, figsize=(20, 10))
+
+    for i, var_name in enumerate(variable_names):
+        row, col = divmod(i, 4)
+        ax = axs[row, col]
+
+        data = vector_out[sample_index, i, ...]
+        im = ax.imshow(data, cmap='viridis')
+        ax.set_facecolor("white")
+        ax.set_title(var_name)
+        ax.axis('off')
+
+        cbar = fig.colorbar(im, ax=ax, orientation='vertical', shrink=0.7, pad=0.03)
+        cbar.ax.tick_params(labelsize=8)
+
+    plt.tight_layout()
+    plt.show()
+
+    return vector_out
