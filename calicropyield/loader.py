@@ -1,12 +1,22 @@
-
+from pathlib import Path
 import os
 import json
 import zipfile
 import gdown
 import numpy as np
+import xarray as xr
+import geopandas as gpd
 import rasterio
 from rasterio.mask import mask
 from datetime import datetime
+import pickle
+from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from google.oauth2 import service_account
+
+
+
 
 
 CDL_CLASS_MAP = {
@@ -446,147 +456,259 @@ CROP_NAME_MANUAL_MATCHES = {
         }
 
 
+DRIVER_ROOT_ID = "1Ci_LlLF1-hcLt898CTbyYnYTFPZNWlUe"
+CREDENTIAL_PATH ="tokens/service_account.json"
+SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
+
+
 class DataDownloader:
     def __init__(self, target_dir: str):
         self.target_dir = target_dir
+        self.drive_root_id = DRIVER_ROOT_ID
         os.makedirs(self.target_dir, exist_ok=True)
+        self.service = self.authenticate_drive()
 
-        # Load Google Drive file IDs from bundled JSON
-        links_path = os.path.join(os.path.dirname(__file__), "data_links.json")
-        with open(links_path, "r") as f:
-            self.data_links = json.load(f)
+    def authenticate_drive(self):
+        creds_path = Path(__file__).parent / CREDENTIAL_PATH
 
-    def _download_single_tif(self, county, year, filename, file_id, dataset_type):
-        url = f"https://drive.google.com/uc?id={file_id}"
-        year_dir = os.path.join(self.target_dir, "counties", county, "data", dataset_type, str(year))
-        os.makedirs(year_dir, exist_ok=True)
-        output_path = os.path.join(year_dir, filename)
+        credentials = service_account.Credentials.from_service_account_file(
+            creds_path,
+            scopes=["https://www.googleapis.com/auth/drive.readonly"]
+        )
+        return build('drive', 'v3', credentials=credentials)
+
+    def get_subfolder_id(self, parent_id, folder_name):
+        response = self.service.files().list(
+            q=f"mimeType='application/vnd.google-apps.folder' and name='{folder_name}' and '{parent_id}' in parents and trashed=false",
+            spaces='drive',
+            fields='files(id, name)'
+        ).execute()
+        folders = response.get("files", [])
+        return folders[0]["id"] if folders else None
+
+    def find_file(self, name, parent_folder_id):
+        results = self.service.files().list(
+            q=f"name='{name}' and '{parent_folder_id}' in parents and trashed=false",
+            fields="files(id, name)").execute()
+        items = results.get('files', [])
+        return items[0]['id'] if items else None
+
+    def _download_single_file(self, county, year, filename, dataset_type):
+        county_id = self.get_subfolder_id(self.drive_root_id, county)
+        if not county_id: return None
+        data_id = self.get_subfolder_id(county_id, "data")
+        if not data_id: return None
+        dataset_id = self.get_subfolder_id(data_id, dataset_type)
+        if not dataset_id: return None
+
+        if dataset_type == "soil":
+            file_id = self.find_file(filename, dataset_id)
+            if not file_id:
+                print(f"❌ File not found: {filename}")
+                return None
+            
+            sub_dir = os.path.join(self.target_dir, "counties", county, "data", dataset_type)
+        else:
+            year_id = self.get_subfolder_id(dataset_id, year)
+            if not year_id: return None
+
+            file_id = self.find_file(filename, year_id)
+            if not file_id:
+                print(f"❌ File not found: {filename}")
+                return None
+            
+            sub_dir = os.path.join(self.target_dir, "counties", county, "data", dataset_type, str(year))
+        
+
+        os.makedirs(sub_dir, exist_ok=True)
+        output_path = os.path.join(sub_dir, filename)
 
         if not os.path.exists(output_path):
-            print(f"⬇️  Downloading {filename} for {county} {year}")
-            gdown.download(url, output_path, quiet=False, fuzzy=True)
+            url = f"https://drive.google.com/uc?id={file_id}"
+            print(f"⬇️ Downloading {filename}")
+            gdown.download(url, output_path, quiet=False)
         else:
-            print(f"✅ Already exists: {filename}")
+            print(f"✅ Already exists: {output_path}")
 
         return output_path
 
-    def download_CDL(self, county_name: list, year: list = None, crop_name: list = None, geometry=None):
-
-        if year:
-            year = [str(y) for y in year]
+    def download_ET(self, county_names: list, years: list = None, geometry=None):
+        if years is None:
+            years = [str(y) for y in range(2008, 2023) if y != 2012]
         else:
-            year = [str(y) for y in range(2008, 2023) if y != 2012]
+            years = [str(y) for y in years]
 
-        CROP_NAME_TO_CODE = {v.lower(): k for k, v in CDL_CLASS_MAP.items()}
-        crop_codes = [CROP_NAME_TO_CODE[c.lower()] for c in crop_name if c.lower() in CROP_NAME_TO_CODE] if crop_name else None
+        for county in county_names:
+            for year in years:
+                for month in range(1, 13):
+                    month_str = f"{month:02d}"  # ensures leading zero
+                    filename = f"{county}_OpenET_{year}_{month_str}.tif"
+                    path = self._download_single_file(county, year, filename, dataset_type="et")
 
-        log_path = os.path.join(self.target_dir, "logs", "cdl_download_log.jsonl")
-        os.makedirs(os.path.dirname(log_path), exist_ok=True)
-
-        for county in county_name:
-            county_links = self.data_links.get("cdl", {}).get(county, {})
-            for y in year:
-                year_info = county_links.get(str(y))
-                if not year_info:
-                    print(f"⚠️ No data for {county} {y}")
-                    continue
-
-                filename = year_info["filename"]
-                file_id = year_info["file_id"]
-                src_path = self._download_single_tif(county, y, filename, file_id, dataset_type="cdl")
-                self._process_raster(src_path, county, y, filename, crop_codes, geometry, log_path)
-
-    def download_ET(self, county_name: list, year: list = None, geometry=None):
-        self._generic_raster_download("et", county_name, year, geometry)
-
-    def download_Landsat(self, county_name: list, year: list = None, geometry=None):
-        self._generic_raster_download("landsat", county_name, year, geometry)
-
-    def download_DayMet(self, county_name: list, year: list = None, variables: list = None, geometry=None):
-        self._generic_raster_download("climate", county_name, year, geometry, variables)
-
-    def download_soil(self, county_name: list, variable: list = None, spatial_resolution: str = None, geometry=None):
-        for county in county_name:
-            county_links = self.data_links.get("soil", {}).get(county, {})
-            for fname, file_info in county_links.items():
-                if variable and not any(v in fname for v in variable):
-                    continue
-                if spatial_resolution and spatial_resolution not in fname:
-                    continue
-
-                src_path = self._download_single_tif(county, "static", fname, file_info["file_id"], dataset_type="soil")
-                self._process_raster(src_path, county, "static", fname, crop_codes=None, geometry=geometry, log_path=os.path.join(self.target_dir, "logs", "soil_download_log.jsonl"))
-
-    def _generic_raster_download(self, dataset_type: str, county_name: list, year: list, geometry=None, variable_filter=None):
-        log_path = os.path.join(self.target_dir, "logs", f"{dataset_type}_download_log.jsonl")
-        os.makedirs(os.path.dirname(log_path), exist_ok=True)
-
-        if year:
-            year = [str(y) for y in year]
+                    if path and geometry:
+                        cropped_path = path.replace(".tif", "_cropped.tif")
+                        success = self._geometry_cropping_tif(geometry=geometry, src_path=path, save_path=cropped_path)
+                        if success:
+                            os.remove(path)
+                            print(f"🗑️ Removed original: {path}")
+                            print(f"✅ Saved cropped: {cropped_path}")
+    
+    def download_Landsat(self, county_names: list, years: list = None, geometry=None):
+        if years is None:
+            years = [str(y) for y in range(2008, 2023) if y != 2012]
         else:
-            year = [str(y) for y in range(2008, 2023) if y != 2012]
+            years = [str(y) for y in years]
 
-        for county in county_name:
-            county_links = self.data_links.get(dataset_type, {}).get(county, {})
-            for y in year:
-                year_info = county_links.get(str(y))
-                if not year_info:
-                    print(f"⚠️ No data for {county} {y}")
-                    continue
+        for county in county_names:
+            for year in years:
+                for month in range(1, 13):
+                    month_str = f"{month:02d}"  # ensures leading zero
+                    filename = f"{county}_LT_{year}_{month_str}.tif"
+                    path = self._download_single_file(county, year, filename, dataset_type="landsat")
 
-                filename = year_info["filename"]
-                if variable_filter and not any(v in filename for v in variable_filter):
-                    continue
+                    if path and geometry:
+                        cropped_path = path.replace(".tif", "_cropped.tif")
+                        success = self._geometry_cropping_tif(geometry=geometry, src_path=path, save_path=cropped_path)
+                        if success:
+                            os.remove(path)
+                            print(f"🗑️ Removed original: {path}")
+                            print(f"✅ Saved cropped: {cropped_path}")
 
-                file_id = year_info["file_id"]
-                src_path = self._download_single_tif(county, y, filename, file_id, dataset_type)
-                self._process_raster(src_path, county, y, filename, crop_codes=None, geometry=geometry, log_path=log_path)
-
-    def _process_raster(self, src_path, county, year, filename, crop_codes, geometry, log_path):
-        relpath = os.path.relpath(src_path, self.target_dir)
-        log_entry = {
-            "timestamp": datetime.now().isoformat(timespec="seconds"),
-            "county": county,
-            "year": year,
-            "filename": filename,
-            "relpath": relpath,
-            "geometry_used": geometry is not None,
-        }
-
+    def _geometry_cropping_tif(self, geometry, src_path, save_path):
         try:
             with rasterio.open(src_path) as src:
-                if geometry:
-                    out_image, out_transform = mask(src, [geometry], crop=True)
-                else:
-                    out_image = src.read()
-                    out_transform = src.transform
-
-                if crop_codes:
-                    mask_array = np.isin(out_image, crop_codes)
-                    out_image = out_image * mask_array
-
+                out_image, out_transform = mask(src, [geometry], crop=True)
                 out_meta = src.meta.copy()
                 out_meta.update({
                     "height": out_image.shape[1],
                     "width": out_image.shape[2],
                     "transform": out_transform
                 })
-
-                filtered_fname = filename.replace(".tif", "_filtered.tif")
-                filtered_path = os.path.join(os.path.dirname(src_path), filtered_fname)
-                with rasterio.open(filtered_path, "w", **out_meta) as dst:
+                with rasterio.open(save_path, "w", **out_meta) as dst:
                     dst.write(out_image)
-
-                log_entry["status"] = "cropped" if geometry or crop_codes else "copied"
-                log_entry["filtered_path"] = os.path.relpath(filtered_path, self.target_dir)
-
-            os.remove(src_path)
-            print(f"🗑️ Removed original: {src_path}")
+            return True
         except Exception as e:
-            log_entry["status"] = "error"
-            log_entry["error"] = str(e)
+            print(f"❌ Cropping failed for {src_path}: {e}")
+            return False
 
-        with open(log_path, "a") as logf:
-            logf.write(json.dumps(log_entry) + "\n")
+    def download_Climate(self, county_names: list, years: list = None, geometry=None, variables=None):
+        if years is None:
+            years = [str(y) for y in range(2008, 2023) if y != 2012]
+        else:
+            years = [str(y) for y in years]
 
-        print(f"  [{log_entry['status'].upper()}] {county} {year} → {filename}")
+        for county in county_names:
+            for year in years:
+                filename = f"{county}_DayMet_{year}.nc"
+                path = self._download_single_file(county, year, filename, dataset_type="climate")
+
+                if path and geometry:
+                    cropped_path = path.replace(".nc", "_cropped.nc")
+                    success = self._geometry_cropping_netcdf(geometry=geometry, src_path=path, save_path=cropped_path, variables = variables)
+                    if success:
+                        os.remove(path)
+                        print(f"🗑️ Removed original: {path}")
+                        print(f"✅ Saved cropped: {cropped_path}")
+
+    def _geometry_cropping_netcdf(self, geometry, src_path, save_path, variables=None):
+        try:
+            # Load dataset
+            ds = xr.open_dataset(src_path)
+
+            # Select specific variables if requested
+            if variables is not None:
+                ds = ds[variables]
+
+            # Convert geometry to GeoDataFrame
+            gdf = gpd.GeoDataFrame(geometry=[geometry], crs="EPSG:4326")  # Adjust CRS if needed
+
+            # Reproject GeoDataFrame to match NetCDF's CRS
+            if 'crs' in ds.attrs:
+                gdf = gdf.to_crs(ds.attrs['crs'])
+
+            # Get bounds from geometry
+            bounds = gdf.total_bounds
+            minx, miny, maxx, maxy = bounds
+
+            # Crop the dataset using .sel
+            cropped = ds.sel(
+                lon=slice(minx, maxx),
+                lat=slice(miny, maxy)
+            )
+
+            # Save the cropped NetCDF
+            cropped.to_netcdf(save_path)
+
+            print(f"✅ Cropped and saved: {save_path}")
+            return True
+
+        except Exception as e:
+            print(f"❌ Cropping NetCDF failed for {src_path}: {e}")
+            return False
+
+    def download_Soil(self, county_names: list, geometry=None, variables=None):
+
+        for county in county_names:
+
+            filename = f"{county}_soil.nc"
+            path = self._download_single_file(county, year = None, filename = filename, dataset_type="soil")
+
+            if path and geometry:
+                cropped_path = path.replace(".nc", "_cropped.nc")
+                success = self._geometry_cropping_netcdf(geometry=geometry, src_path=path, save_path=cropped_path, variables = variables)
+                if success:
+                    os.remove(path)
+                    print(f"🗑️ Removed original: {path}")
+                    print(f"✅ Saved cropped: {cropped_path}")
+
+    def download_CDL(self, county_names: list, years: list = None, geometry=None, crop_types: list = None):
+        if years is None:
+            years = [str(y) for y in range(2008, 2023) if y != 2012]
+        else:
+            years = [str(y) for y in years]
+
+        for county in county_names:
+            for year in years:
+                filename = f"{county}_CDL_{year}.TIF"
+                path = self._download_single_file(county, year, filename, dataset_type="cdl")
+
+                if path:
+                    cropped_path = path.replace(".TIF", "_cropped.TIF")
+                    success = self._process_cdl(src_path=path, save_path=cropped_path, geometry=geometry, crop_types=crop_types)
+                    if success:
+                        os.remove(path)
+                        print(f"🗑️ Removed original: {path}")
+                        print(f"✅ Saved processed CDL: {cropped_path}")
+
+    def _process_cdl(self, src_path, save_path, geometry=None, crop_types=None):
+        try:
+            with rasterio.open(src_path) as src:
+                cdl_data = src.read(1)
+                cdl_meta = src.meta.copy()
+                transform = src.transform
+
+                # Geometry-based masking (optional)
+                if geometry:
+                    out_image, out_transform = mask(src, [geometry], crop=True)
+                    cdl_data = out_image[0]
+                    cdl_meta.update({
+                        "height": cdl_data.shape[0],
+                        "width": cdl_data.shape[1],
+                        "transform": out_transform
+                    })
+
+                # Crop type filtering (optional)
+                if crop_types:
+                    crop_type_codes = [code for code, name in CDL_CLASS_MAP.items() if name in crop_types]
+                    mask_array = np.isin(cdl_data, crop_type_codes)
+                    cdl_data = np.where(mask_array, cdl_data, 0)
+
+            # Write the processed raster
+            with rasterio.open(save_path, "w", **cdl_meta) as dst:
+                dst.write(cdl_data, 1)
+
+            return True
+
+        except Exception as e:
+            print(f"❌ Failed to process CDL {src_path}: {e}")
+            return False

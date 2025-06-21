@@ -107,7 +107,9 @@ This dataset and benchmark are described in the paper:
 
 **California Crop Yield Benchmark: Combining Satellite Image, Climate, Evapotranspiration, and Soil Data Layers for County-Level Yield Forecasting of Over 70 Crops**
 
-_Link coming soon_
+[![arXiv](https://img.shields.io/badge/arXiv-2506.10228-b31b1b.svg)](https://arxiv.org/abs/2506.10228)
+[![HuggingFace](https://img.shields.io/badge/HuggingFace-Dataset-orange)](https://huggingface.co/datasets/hkaman/california-crop-yield-benchmark)
+[![CVPR](https://img.shields.io/badge/CVPR-2025-blue)](https://openaccess.thecvf.com/content/CVPR2025W/V4A/papers/Kamangir_California_Crop_Yield_Benchmark_Combining_Satellite_Image_Climate_Evapotranspiration_and_CVPRW_2025_paper.pdf)
 
 ---
 

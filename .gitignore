@@ -1,10 +1,22 @@
 # Object file
 *.o
-
+# Log files
+*.log
+logs/
+*.jsonl
 # Ada Library Information
 *.ali
+*
 __pycache__
+.env
+*.pyc
 test_code
 data
 P1
 P2
+service_account.json
+credential.json
+token.pickle
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+tokens
