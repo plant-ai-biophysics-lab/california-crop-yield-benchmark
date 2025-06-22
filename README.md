@@ -1,11 +1,9 @@
 >**California Crop Yield Benchmark: Combining Satellite Image, Climate, Evapotranspiration, and Soil Data Layers for County-Level Yield Forecasting of Over 70 Crops**
 
 
-
-<br>
 ![California Crop Yield Benchmark](images/init.png)
-<br>
 
+<br>
 This benchmark offers a comprehensive, unified, and multi-modal dataset for county-level crop yield prediction across California. It integrates diverse data sources, including monthly time series from Landsat satellite imagery, monthly evapotranspiration (ET) data, daily DayMet climate variables, static soil attributes, annual Cropland Data Layer (CDL) for pixel-wise crop classification, and USDA-reported county-level yield data for over 70 crops. Designed to support machine learning research in agriculture and environmental modeling, this dataset enables robust analysis and development of predictive models across spatial and temporal scales.
 <br>
 
