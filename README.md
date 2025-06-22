@@ -1,15 +1,19 @@
-# california-crop-yield-benchmark
+>**California Crop Yield Benchmark: Combining Satellite Image, Climate, Evapotranspiration, and Soil Data Layers for County-Level Yield Forecasting of Over 70 Crops**
 
-**California Crop Yield Benchmark: Combining Satellite Image, Climate, Evapotranspiration, and Soil Data Layers for County-Level Yield Forecasting of Over 70 Crops**
 
+
+<br>
+![California Crop Yield Benchmark](images/init.png)
+<br>
+
+This benchmark offers a comprehensive, unified, and multi-modal dataset for county-level crop yield prediction across California. It integrates diverse data sources, including monthly time series from Landsat satellite imagery, monthly evapotranspiration (ET) data, daily DayMet climate variables, static soil attributes, annual Cropland Data Layer (CDL) for pixel-wise crop classification, and USDA-reported county-level yield data for over 70 crops. Designed to support machine learning research in agriculture and environmental modeling, this dataset enables robust analysis and development of predictive models across spatial and temporal scales.
+<br>
 
 [![arXiv](https://img.shields.io/badge/arXiv-2506.10228-b31b1b.svg)](https://arxiv.org/abs/2506.10228)
 [![HuggingFace](https://img.shields.io/badge/HuggingFace-Dataset-orange)](https://huggingface.co/datasets/hkaman/california-crop-yield-benchmark)
 [![CVPR](https://img.shields.io/badge/CVPR-2025-blue)](https://openaccess.thecvf.com/content/CVPR2025W/V4A/papers/Kamangir_California_Crop_Yield_Benchmark_Combining_Satellite_Image_Climate_Evapotranspiration_and_CVPRW_2025_paper.pdf)
-<br>
-![California Crop Yield Benchmark](images/init.png)
-<br>
-This benchmark offers a comprehensive, unified, and multi-modal dataset for county-level crop yield prediction across California. It integrates diverse data sources, including monthly time series from Landsat satellite imagery, monthly evapotranspiration (ET) data, daily DayMet climate variables, static soil attributes, annual Cropland Data Layer (CDL) for pixel-wise crop classification, and USDA-reported county-level yield data for over 70 crops. Designed to support machine learning research in agriculture and environmental modeling, this dataset enables robust analysis and development of predictive models across spatial and temporal scales.
+
+
 ---
 
 ## 📁 Contribution 
