@@ -2,27 +2,26 @@
 
 > **California Crop Yield Benchmark: Combining Satellite Image, Climate, Evapotranspiration, and Soil Data Layers for County-Level Yield Forecasting of Over 70 Crops**
 
+
+[![arXiv](https://img.shields.io/badge/arXiv-2506.10228-b31b1b.svg)](https://arxiv.org/abs/2506.10228)
+[![HuggingFace](https://img.shields.io/badge/HuggingFace-Dataset-orange)](https://huggingface.co/datasets/hkaman/california-crop-yield-benchmark)
+[![CVPR](https://img.shields.io/badge/CVPR-2025-blue)](https://openaccess.thecvf.com/content/CVPR2025W/V4A/papers/Kamangir_California_Crop_Yield_Benchmark_Combining_Satellite_Image_Climate_Evapotranspiration_and_CVPRW_2025_paper.pdf)
+
 ![California Crop Yield Benchmark](images/init.png)
 
-
+This benchmark offers a comprehensive, unified, and multi-modal dataset for county-level crop yield prediction across California. It integrates diverse data sources, including monthly time series from Landsat satellite imagery, monthly evapotranspiration (ET) data, daily DayMet climate variables, static soil attributes, annual Cropland Data Layer (CDL) for pixel-wise crop classification, and USDA-reported county-level yield data for over 70 crops. Designed to support machine learning research in agriculture and environmental modeling, this dataset enables robust analysis and development of predictive models across spatial and temporal scales.
 ---
 
-## 🌾 Overview
+## 📁 Contribution 
+The **calicropyield** dataset
+- The first terabyte-sized, publicly available, and multi-modal dataset for california climate change-aware crop yield predictions
+- The calicropyield dataset is available at [![Google Drive](https://img.shields.io/badge/arXiv-2506.10228-b31b1b.svg)](https://arxiv.org/abs/2506.10228)
 
-This benchmark provides a unified, multi-modal dataset for county-level crop yield prediction across California. It integrates:
-
-- **Landsat satellite imagery** (monthly time series)
-- **Evapotranspiration (ET)** data (monthly)
-- **DayMet Climate variables** (daily)
-- **Soil attributes** (static)
-- **Cropland Data Layer (CDL)** (yearly, pixel-wise crop classification)
-- **USDA-reported county-level yield** (annual ground truth for 70+ crops)
-
-> ✅ Designed to support machine learning research in agriculture and environmental modeling
+The  **calicropyield** package
+- A deep learning-ready Python package for facilitating researchers in downloading the calicropyield data on the fly over the time and region of interest, and developing deep neural networks (DNNs) for climate change-aware crop yield predictions
+- The calicropyield package is available at Python Package Index (PyPI)
 
 ---
-
-## 📁 Dataset Structure
 
 Each county follows this directory layout:
 
@@ -37,7 +36,32 @@ counties/
               └── soil/
 ```
 
+## 🗂️ Available Downloads
+
+| Dataset     | Format | Temporal Resolution | Spatial | Source |
+|-------------|--------|---------------------|---------|--------|
+| CDL         | `.tif` | Yearly              | 30m     | USDA   |
+| Landsat     | `.tif` | Monthly             | 30m     | USGS   |
+| ET          | `.tif` | Monthly             | 30m     | OpenET |
+| DayMet      | `.nc`  | Daily               | 1km     | DayMet |
+| Soil        | `.nc`  | Static              | Varies  | NRCS   |
+| USDA Yield  | `.csv` | Annual              | County  | NASS   |
+
 ---
+
+## 📷 Example Visualizations
+
+![Climate Sample](images/climate_sample.png)
+![ET Sample](images/et_sample.png)
+![Soil Sample](images/soil_sample.png)
+
+---
+The calicropyield package
+Beyond the contribution of our california crop yield dataset, we also release the calicropyield package in the Python Package Index (PyPI) for facilitating researchers in downloading the california crop yield benchmark data based on the time and region of interest, and flexibly building their deep learning models for accurate crop yield predictions. In particular, the calicropyield package includes three types of APIs, listed as follows:
+
+**DataDownloader**: This API allows users to download the calicropyield data over the time/region of interest on the fly and stored in the local machine (e.g., if you have downloaded our curated calicropyield from Google Drive) over the time/region of interest.
+
+**DataLoader**: This API is designed to facilitate researchers in developing their DNNs for accurate crop yield predictions. Specifically, the code in this API (1) combines all four modalities of data to create tuples, with appropriate, respectively representing satellite images, daily whether parameters, ET, Soil and ground-truth crop yield (or production) information, and then (2) exposes those tuples via a Dataset object after appropriate data pre-processing techniques.
 
 ## 🔧 Installation
 
@@ -63,63 +87,47 @@ from calicropyield.loader import DataDownloader
 downloader = DataDownloader(target_dir="./data")
 
 downloader.download_CDL(
-    county_name=["Alameda", "Fresno"],
-    year=[2022],
-    crop_name=["Corn", "Alfalfa"],
-    geometry=None  # Optional geometry for spatial cropping
+    county = ["Alameda", "Fresno"], # List of county names
+    year = [2022], # List of years
+    crop = ["Corn", "Alfalfa"], # List of crop names
+    geometry = None  # Optional geometry for spatial cropping
 )
 
 # Other available methods
-# downloader.download_ET(...)
-# downloader.download_Landsat(...)
-# downloader.download_DayMet(...)
-# downloader.download_soil(...)
-# downloader.download_USDA(...)
+downloader.download_ET(county: list= None, year: list = None, geometry=None)
+downloader.download_Landsat(county: list= None, year: list = None, geometry=None)
+downloader.download_Climate(county: list= None, year: list = None, variable: list = None, geometry=None)
+downloader.download_Soil(county: list= None, variable: list = None, geometry=None)
+downloader.download_USDA(county: list= None, year: list = None, crop: list  = None)
 ```
-
 ---
+## 📚 Tutorials
 
-## 🗂️ Available Downloads
+The tutorials for the California Crop Yield Benchmark are available in Google Colab, with their links listed below:
 
-| Dataset     | Format | Temporal Resolution | Spatial | Source |
-|-------------|--------|---------------------|---------|--------|
-| CDL         | `.tif` | Yearly              | 30m     | USDA   |
-| Landsat     | `.tif` | Monthly             | 30m     | USGS   |
-| ET          | `.tif` | Monthly             | 30m     | OpenET |
-| DayMet      | `.nc`  | Daily               | 1km     | DayMet |
-| Soil        | `.nc`  | Static              | Varies  | NRCS   |
-| USDA Yield  | `.csv` | Annual              | County  | NASS   |
-
----
-
-## 📊 Benchmark Model
-
-This repository is accompanied by a baseline multimodal deep learning model (coming soon) for county-level yield regression using the full stack of modalities.
-
-![Multimodal ViT](images/model.png)
+- [📗 Download CDL Data](https://colab.research.google.com/github/<username>/<repo>/blob/main/tutorial/download_cdl.ipynb)
+- [📘 Download Climate Data](https://colab.research.google.com/github/<username>/<repo>/blob/main/tutorial/download_climate.ipynb)
+- [📙 Download ET Data](https://colab.research.google.com/github/<username>/<repo>/blob/main/tutorial/download_et.ipynb)
+- [📕 Download Landsat Imagery](https://colab.research.google.com/github/<username>/<repo>/blob/main/tutorial/download_landsat.ipynb)
+- [📒 Download Soil Attributes](https://colab.research.google.com/github/<username>/<repo>/blob/main/tutorial/download.soil.ipynb)
+- [📓 Download USDA Yield Data](https://colab.research.google.com/github/<username>/<repo>/blob/main/tutorial/download_usda.ipynb)
 
 
 ---
 
-## 📌 Paper
+## 📌 Citation
 
-This dataset and benchmark are described in the paper:
+If you use this dataset or benchmark in your work, please cite our paper:
 
-**California Crop Yield Benchmark: Combining Satellite Image, Climate, Evapotranspiration, and Soil Data Layers for County-Level Yield Forecasting of Over 70 Crops**
+@InProceedings{Kamangir_2025_CVPR,
+    author    = {Kamangir, Hamid and Hajiesmaeeli, Mona and Earles, J. Mason},
+    title     = {California Crop Yield Benchmark: Combining Satellite Image, Climate, Evapotranspiration, and Soil Data Layers for County-Level Yield Forecasting of Over 70 Crops},
+    booktitle = {Proceedings of the Computer Vision and Pattern Recognition Conference (CVPR) Workshops},
+    month     = {June},
+    year      = {2025},
+    pages     = {5491--5500}
+}
 
-[![arXiv](https://img.shields.io/badge/arXiv-2506.10228-b31b1b.svg)](https://arxiv.org/abs/2506.10228)
-[![HuggingFace](https://img.shields.io/badge/HuggingFace-Dataset-orange)](https://huggingface.co/datasets/hkaman/california-crop-yield-benchmark)
-[![CVPR](https://img.shields.io/badge/CVPR-2025-blue)](https://openaccess.thecvf.com/content/CVPR2025W/V4A/papers/Kamangir_California_Crop_Yield_Benchmark_Combining_Satellite_Image_Climate_Evapotranspiration_and_CVPRW_2025_paper.pdf)
-
----
-
-## 📷 Example Visualizations
-
-![Climate Sample](images/climate_sample.png)
-![ET Sample](images/et_sample.png)
-![Soil Sample](images/soil_sample.png)
-
----
 
 ## 🤝 License
 
