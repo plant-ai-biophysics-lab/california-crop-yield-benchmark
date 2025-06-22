@@ -1,21 +1,21 @@
 # california-crop-yield-benchmark
 
-> **California Crop Yield Benchmark: Combining Satellite Image, Climate, Evapotranspiration, and Soil Data Layers for County-Level Yield Forecasting of Over 70 Crops**
+**California Crop Yield Benchmark: Combining Satellite Image, Climate, Evapotranspiration, and Soil Data Layers for County-Level Yield Forecasting of Over 70 Crops**
 
 
 [![arXiv](https://img.shields.io/badge/arXiv-2506.10228-b31b1b.svg)](https://arxiv.org/abs/2506.10228)
 [![HuggingFace](https://img.shields.io/badge/HuggingFace-Dataset-orange)](https://huggingface.co/datasets/hkaman/california-crop-yield-benchmark)
 [![CVPR](https://img.shields.io/badge/CVPR-2025-blue)](https://openaccess.thecvf.com/content/CVPR2025W/V4A/papers/Kamangir_California_Crop_Yield_Benchmark_Combining_Satellite_Image_Climate_Evapotranspiration_and_CVPRW_2025_paper.pdf)
-
+<br>
 ![California Crop Yield Benchmark](images/init.png)
-
+<br>
 This benchmark offers a comprehensive, unified, and multi-modal dataset for county-level crop yield prediction across California. It integrates diverse data sources, including monthly time series from Landsat satellite imagery, monthly evapotranspiration (ET) data, daily DayMet climate variables, static soil attributes, annual Cropland Data Layer (CDL) for pixel-wise crop classification, and USDA-reported county-level yield data for over 70 crops. Designed to support machine learning research in agriculture and environmental modeling, this dataset enables robust analysis and development of predictive models across spatial and temporal scales.
 ---
 
 ## 📁 Contribution 
 The **calicropyield** dataset
 - The first terabyte-sized, publicly available, and multi-modal dataset for california climate change-aware crop yield predictions
-- The calicropyield dataset is available at [![Google Drive](https://img.shields.io/badge/arXiv-2506.10228-b31b1b.svg)](https://arxiv.org/abs/2506.10228)
+- The calicropyield dataset is available at [Google Drive](https://drive.google.com/drive/folders/1Ci_LlLF1-hcLt898CTbyYnYTFPZNWlUe?usp=sharing)
 
 The  **calicropyield** package
 - A deep learning-ready Python package for facilitating researchers in downloading the calicropyield data on the fly over the time and region of interest, and developing deep neural networks (DNNs) for climate change-aware crop yield predictions
@@ -118,7 +118,7 @@ The tutorials for the California Crop Yield Benchmark are available in Google Co
 ## 📌 Citation
 
 If you use this dataset or benchmark in your work, please cite our paper:
-
+```
 @InProceedings{Kamangir_2025_CVPR,
     author    = {Kamangir, Hamid and Hajiesmaeeli, Mona and Earles, J. Mason},
     title     = {California Crop Yield Benchmark: Combining Satellite Image, Climate, Evapotranspiration, and Soil Data Layers for County-Level Yield Forecasting of Over 70 Crops},
@@ -127,7 +127,7 @@ If you use this dataset or benchmark in your work, please cite our paper:
     year      = {2025},
     pages     = {5491--5500}
 }
-
+```
 
 ## 🤝 License
 
