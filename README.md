@@ -104,7 +104,7 @@ downloader.download_USDA(county_names: list= None, years: list = None, crop_name
 The tutorials for the California Crop Yield Benchmark are available in Google Colab, with their links listed below:
 
 - [📗 Download CDL Data](https://github.com/plant-ai-biophysics-lab/california-crop-yield-benchmark/blob/main/tutorial/download_cdl.ipynb)
-- [📘 Download Climate Data](hhttps://github.com/plant-ai-biophysics-lab/california-crop-yield-benchmark/blob/main/tutorial/download_climate.ipynb)
+- [📘 Download Climate Data](https://github.com/plant-ai-biophysics-lab/california-crop-yield-benchmark/blob/main/tutorial/download_climate.ipynb)
 - [📙 Download ET Data](https://github.com/plant-ai-biophysics-lab/california-crop-yield-benchmark/blob/main/tutorial/download_et.ipynb)
 - [📕 Download Landsat Imagery](https://github.com/plant-ai-biophysics-lab/california-crop-yield-benchmark/blob/main/tutorial/download_landsat.ipynb)
 - [📒 Download Soil Attributes](https://github.com/plant-ai-biophysics-lab/california-crop-yield-benchmark/blob/main/tutorial/download_soil.ipynb)
