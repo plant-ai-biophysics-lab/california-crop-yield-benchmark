@@ -13,7 +13,7 @@ __pycache__/
 .env
 .env.local
 venv/
-
+data/
 # Jupyter notebook checkpoints
 .ipynb_checkpoints/
 

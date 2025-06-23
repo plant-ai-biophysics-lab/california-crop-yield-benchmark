@@ -71,14 +71,6 @@ Beyond the contribution of our california crop yield dataset, we also release th
 pip install calicropyield
 ```
 
-Or clone and install locally:
-
-```bash
-git clone https://github.com/yourname/california-crop-yield-benchmark.git
-cd california-crop-yield-benchmark
-pip install .
-```
-
 ---
 
 ## 🧠 Quick Start
@@ -95,12 +87,16 @@ downloader.download_CDL(
     geometry = None  # Optional geometry for spatial cropping
 )
 
+downloader.download_Landsat(
+    county_names = ["Alameda", "Fresno"], 
+    years = [2019, 2022], 
+    geometry = None)
+
 # Other available methods
-downloader.download_ET(county: list= None, year: list = None, geometry=None)
-downloader.download_Landsat(county: list= None, year: list = None, geometry=None)
-downloader.download_Climate(county: list= None, year: list = None, variable: list = None, geometry=None)
-downloader.download_Soil(county: list= None, variable: list = None, geometry=None)
-downloader.download_USDA(county: list= None, year: list = None, crop: list  = None)
+downloader.download_ET(county_names: list = None, years: list = None, geometry = None)
+downloader.download_Climate(county_names: list= None, years: list = None, variables: list = None, geometry=None)
+downloader.download_Soil(county_names: list= None, variable: list = None, geometry=None)
+downloader.download_USDA(county_names: list= None, years: list = None, crop_names: list  = None)
 ```
 ---
 ## 📚 Tutorials
